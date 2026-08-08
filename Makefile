@@ -28,7 +28,7 @@ export BASELINE_SERVE_PORT ?= 18080
 export KIND_CLUSTER_NAME ?= ml-platform-study-dev
 export KIND_CONFIG ?= clusters/dev/kind/cluster.yaml
 
-.PHONY: test test-versions test-contracts test-baseline-data compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete
 test:
 	python -m pytest
 
@@ -40,6 +40,9 @@ test-contracts:
 
 test-baseline-data:
 	python -m pytest tests/examples
+
+test-manifests:
+	python -m pytest tests/manifests
 
 compose-up-postgres:
 	docker compose up -d postgres
