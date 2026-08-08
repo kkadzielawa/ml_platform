@@ -14,8 +14,14 @@ export GARAGE_S3_PORT ?= 3900
 export GARAGE_ADMIN_PORT ?= 3903
 export MLFLOW_PORT ?= 5000
 export MLFLOW_TRACKING_URI ?= http://127.0.0.1:$(MLFLOW_PORT)
+export PROMETHEUS_PORT ?= 19090
+export PROMETHEUS_URL ?= http://127.0.0.1:$(PROMETHEUS_PORT)
+export GRAFANA_PORT ?= 13000
+export GRAFANA_URL ?= http://127.0.0.1:$(GRAFANA_PORT)
+export GRAFANA_ADMIN_USER ?= admin
+export GRAFANA_ADMIN_PASSWORD ?= local-dev-grafana-password
 
-.PHONY: test test-versions test-contracts compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow
+.PHONY: test test-versions test-contracts compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability
 test:
 	python -m pytest
 
@@ -45,3 +51,11 @@ compose-up-mlflow: compose-up-postgres compose-up-object-store
 
 test-mlflow:
 	docker compose exec -T mlflow python /opt/mlflow/tests/smoke_mlflow.py
+
+compose-up-observability:
+	docker compose up -d prometheus grafana
+	bash config/prometheus/wait-for-prometheus.sh
+	bash config/grafana/wait-for-grafana.sh
+
+test-observability:
+	python tests/integration/observability/smoke_observability.py
