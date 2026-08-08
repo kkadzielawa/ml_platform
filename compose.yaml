@@ -107,6 +107,41 @@ services:
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
 
+  baseline-serving:
+    image: ${BASELINE_TRAIN_IMAGE:?BASELINE_TRAIN_IMAGE is required}
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    network_mode: host
+    environment:
+      AWS_ACCESS_KEY_ID: ${GARAGE_KEY_ID:?GARAGE_KEY_ID is required}
+      AWS_DEFAULT_REGION: ${GARAGE_S3_REGION:-garage}
+      AWS_REGION: ${GARAGE_S3_REGION:-garage}
+      AWS_SECRET_ACCESS_KEY: ${GARAGE_SECRET_KEY:?GARAGE_SECRET_KEY is required}
+      BASELINE_MODEL_NAME: ${BASELINE_MODEL_NAME:-housing-sale-baseline}
+      BASELINE_MODEL_VERSION: ${BASELINE_MODEL_VERSION:-}
+      BASELINE_SERVE_PORT: ${BASELINE_SERVE_PORT:-18080}
+      GIT_PYTHON_REFRESH: quiet
+      MLFLOW_S3_ENDPOINT_URL: http://127.0.0.1:${GARAGE_S3_PORT:-3900}
+      MLFLOW_TRACKING_URI: http://127.0.0.1:${MLFLOW_PORT:-5000}
+      PYTHONPATH: /workspace/src:/workspace
+    volumes:
+      - .:/workspace:ro
+    working_dir: /workspace
+    command:
+      - sh
+      - -ec
+      - |
+        : "$${BASELINE_MODEL_VERSION:?BASELINE_MODEL_VERSION is required}"
+        python -c "import boto3, fastapi, mlflow, sklearn, uvicorn" || python -m pip install --no-cache-dir ${BASELINE_SERVE_PACKAGES:?BASELINE_SERVE_PACKAGES is required}
+        exec python -m uvicorn examples.sklearn_baseline.service.app:app --host 127.0.0.1 --port "$${BASELINE_SERVE_PORT}"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('BASELINE_SERVE_PORT', '18080') + '/healthz', timeout=2).read()\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
 volumes:
   postgres-data:
   garage-data:
