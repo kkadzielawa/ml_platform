@@ -1,0 +1,79 @@
+schema_version: 1
+catalog_date: "2026-08-08"
+target_platform:
+  os: linux
+  architecture: amd64
+policy_document: docs/version-policy.md
+
+components:
+  - name: python
+    kind: runtime
+    phase: "00"
+    version: "3.12.13"
+    source_url: https://www.python.org/downloads/release/python-31213/
+    notes: "Pinned as the Phase 0 Python 3.12 line. The package minimum remains >=3.11."
+
+  - name: base-image
+    kind: image
+    phase: "00"
+    version: "3.12.13"
+    source_url: https://hub.docker.com/_/python
+    image:
+      repository: docker.io/library/python
+      tag: 3.12.13-slim-bookworm
+      digest: sha256:6e13e65c55e33adf203d77ee371cf8bf5d81bd4902ef07565721f46bf44917af
+      reference: docker.io/library/python:3.12.13-slim-bookworm@sha256:6e13e65c55e33adf203d77ee371cf8bf5d81bd4902ef07565721f46bf44917af
+      os: linux
+      architecture: amd64
+
+  - name: postgresql
+    kind: image
+    phase: "00"
+    version: "16.14"
+    source_url: https://www.postgresql.org/support/versioning/
+    image:
+      repository: docker.io/library/postgres
+      tag: 16.14-bookworm
+      digest: sha256:714b08dd70c05160db032e4321033ac4e5b6328935b2d03ed419c3a898aa8219
+      reference: docker.io/library/postgres:16.14-bookworm@sha256:714b08dd70c05160db032e4321033ac4e5b6328935b2d03ed419c3a898aa8219
+      os: linux
+      architecture: amd64
+
+  - name: mlflow
+    kind: image
+    phase: "00"
+    version: "3.13.0"
+    source_url: https://github.com/mlflow/mlflow/releases/tag/v3.13.0
+    image:
+      repository: ghcr.io/mlflow/mlflow
+      tag: v3.13.0
+      digest: sha256:a5cd51cd14b570ec4374a4dad76a8ff92b7a0a6f66904c871cee18703487d23f
+      reference: ghcr.io/mlflow/mlflow:v3.13.0@sha256:a5cd51cd14b570ec4374a4dad76a8ff92b7a0a6f66904c871cee18703487d23f
+      os: linux
+      architecture: amd64
+
+  - name: prometheus
+    kind: image
+    phase: "00"
+    version: "3.13.1"
+    source_url: https://prometheus.io/download/
+    image:
+      repository: docker.io/prom/prometheus
+      tag: v3.13.1
+      digest: sha256:bd2dcadfb0d1096e2a4c21817ac7af918e2f19ff628e4bf25fd67a924c13dd80
+      reference: docker.io/prom/prometheus:v3.13.1@sha256:bd2dcadfb0d1096e2a4c21817ac7af918e2f19ff628e4bf25fd67a924c13dd80
+      os: linux
+      architecture: amd64
+
+  - name: grafana
+    kind: image
+    phase: "00"
+    version: "13.1.0"
+    source_url: https://grafana.com/grafana/download
+    image:
+      repository: docker.io/grafana/grafana
+      tag: "13.1.0"
+      digest: sha256:6ea068891652aa6a65ca9065c26b89de939653803c836426970305c11fd00534
+      reference: docker.io/grafana/grafana:13.1.0@sha256:6ea068891652aa6a65ca9065c26b89de939653803c836426970305c11fd00534
+      os: linux
+      architecture: amd64
