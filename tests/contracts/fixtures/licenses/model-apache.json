@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "record_type": "model-weights",
+  "name": "study-embedding-model",
+  "version": "0.1.0",
+  "source_url": "https://example.local/models/study-embedding-model",
+  "license": {
+    "kind": "spdx",
+    "expression": "Apache-2.0",
+    "classification": "osi-open-source",
+    "osi_approved": true,
+    "attribution_required": true
+  },
+  "review": {
+    "status": "accepted",
+    "decision_by": "study",
+    "decision_date": "2026-08-08",
+    "notes": "Example model record using a permissive OSI-approved license."
+  },
+  "model": {
+    "architecture": "sentence-transformer",
+    "base_model": null
+  }
+}

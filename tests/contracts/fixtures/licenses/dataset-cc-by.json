@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "record_type": "dataset",
+  "name": "study-tabular-dataset",
+  "version": "v0001",
+  "source_url": "https://example.local/datasets/study-tabular-dataset",
+  "license": {
+    "kind": "spdx",
+    "expression": "CC-BY-4.0",
+    "classification": "open-content",
+    "osi_approved": false,
+    "attribution_required": true
+  },
+  "review": {
+    "status": "accepted",
+    "decision_by": "study",
+    "decision_date": "2026-08-08",
+    "notes": "Open-content dataset license accepted for local study with attribution."
+  },
+  "dataset": {
+    "contains_personal_data": false,
+    "attribution_text": "Example dataset attribution."
+  }
+}
