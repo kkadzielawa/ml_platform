@@ -26,7 +26,7 @@ export BASELINE_SERVE_PACKAGES ?= boto3==1.43.67 fastapi==0.115.6 httpx==0.28.1 
 export BASELINE_MODEL_NAME ?= housing-sale-baseline
 export BASELINE_SERVE_PORT ?= 18080
 
-.PHONY: test test-versions test-contracts test-baseline-data compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke
+.PHONY: test test-versions test-contracts test-baseline-data compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00
 test:
 	python -m pytest
 
@@ -84,3 +84,6 @@ serve-baseline: compose-up-mlflow
 
 serve-baseline-smoke: train-baseline
 	docker run --rm --network host -v "$(CURDIR):/workspace" -w /workspace -e PYTHONPATH=/workspace/src:/workspace -e RUN_BASELINE_SERVICE_INTEGRATION=1 -e BASELINE_MODEL_NAME="$(BASELINE_MODEL_NAME)" -e MLFLOW_TRACKING_URI=http://127.0.0.1:$(MLFLOW_PORT) -e MLFLOW_S3_ENDPOINT_URL="$(GARAGE_S3_ENDPOINT)" -e AWS_ACCESS_KEY_ID="$(GARAGE_KEY_ID)" -e AWS_SECRET_ACCESS_KEY="$(GARAGE_SECRET_KEY)" -e AWS_DEFAULT_REGION="$(GARAGE_S3_REGION)" -e GIT_PYTHON_REFRESH=quiet "$(BASELINE_TRAIN_IMAGE)" sh -ec 'python -c "import boto3, fastapi, httpx, pytest, sklearn, uvicorn" || python -m pip install --no-cache-dir $(BASELINE_SERVE_PACKAGES); export BASELINE_MODEL_VERSION="$$(python -m examples.sklearn_baseline.service.resolve_model_version)"; python -m pytest examples/sklearn_baseline/tests/test_service.py'
+
+e2e-phase-00: compose-up-mlflow
+	docker run --rm --network host -v "$(CURDIR):/workspace" -w /workspace -e PYTHONPATH=/workspace/src:/workspace -e RUN_PHASE_00_E2E=1 -e BASELINE_SERVE_PACKAGES="$(BASELINE_SERVE_PACKAGES)" -e MLFLOW_TRACKING_URI=http://127.0.0.1:$(MLFLOW_PORT) -e MLFLOW_S3_ENDPOINT_URL="$(GARAGE_S3_ENDPOINT)" -e AWS_ACCESS_KEY_ID="$(GARAGE_KEY_ID)" -e AWS_SECRET_ACCESS_KEY="$(GARAGE_SECRET_KEY)" -e AWS_DEFAULT_REGION="$(GARAGE_S3_REGION)" -e GIT_PYTHON_REFRESH=quiet "$(BASELINE_TRAIN_IMAGE)" bash scripts/phase_00/e2e.sh
