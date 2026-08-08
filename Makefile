@@ -21,7 +21,7 @@ export GRAFANA_URL ?= http://127.0.0.1:$(GRAFANA_PORT)
 export GRAFANA_ADMIN_USER ?= admin
 export GRAFANA_ADMIN_PASSWORD ?= local-dev-grafana-password
 
-.PHONY: test test-versions test-contracts compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability
+.PHONY: test test-versions test-contracts test-baseline-data compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability
 test:
 	python -m pytest
 
@@ -30,6 +30,9 @@ test-versions:
 
 test-contracts:
 	python -m pytest tests/contracts
+
+test-baseline-data:
+	python -m pytest tests/examples
 
 compose-up-postgres:
 	docker compose up -d postgres
