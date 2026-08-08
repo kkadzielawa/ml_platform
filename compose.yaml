@@ -40,6 +40,44 @@ services:
       retries: 12
       start_period: 10s
 
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.13.0@sha256:a5cd51cd14b570ec4374a4dad76a8ff92b7a0a6f66904c871cee18703487d23f
+    depends_on:
+      postgres:
+        condition: service_healthy
+      garage:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${GARAGE_KEY_ID:?GARAGE_KEY_ID is required}
+      AWS_DEFAULT_REGION: ${GARAGE_S3_REGION:-garage}
+      AWS_REGION: ${GARAGE_S3_REGION:-garage}
+      AWS_SECRET_ACCESS_KEY: ${GARAGE_SECRET_KEY:?GARAGE_SECRET_KEY is required}
+      GIT_PYTHON_REFRESH: quiet
+      MLFLOW_BACKEND_STORE_URI: postgresql+psycopg2://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      MLFLOW_DEFAULT_ARTIFACT_ROOT: s3://${GARAGE_BUCKET:?GARAGE_BUCKET is required}/mlflow
+      MLFLOW_S3_ENDPOINT_URL: http://garage:3900
+    ports:
+      - "127.0.0.1:${MLFLOW_PORT:-5000}:5000"
+    volumes:
+      - ./config/mlflow/requirements.txt:/opt/mlflow/requirements.txt:ro
+      - ./tests/integration/mlflow:/opt/mlflow/tests:ro
+    command:
+      - sh
+      - -ec
+      - |
+        python -c "import boto3, psycopg2" || python -m pip install --no-cache-dir -r /opt/mlflow/requirements.txt
+        mlflow server \
+          --host 0.0.0.0 \
+          --port 5000 \
+          --backend-store-uri "$${MLFLOW_BACKEND_STORE_URI}" \
+          --default-artifact-root "$${MLFLOW_DEFAULT_ARTIFACT_ROOT}"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=2).read()\""]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+
 volumes:
   postgres-data:
   garage-data:

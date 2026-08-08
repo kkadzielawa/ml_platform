@@ -12,8 +12,10 @@ export GARAGE_S3_REGION ?= garage
 export GARAGE_S3_ENDPOINT ?= http://127.0.0.1:3900
 export GARAGE_S3_PORT ?= 3900
 export GARAGE_ADMIN_PORT ?= 3903
+export MLFLOW_PORT ?= 5000
+export MLFLOW_TRACKING_URI ?= http://127.0.0.1:$(MLFLOW_PORT)
 
-.PHONY: test test-versions test-contracts compose-up-postgres test-postgres compose-up-object-store test-object-store
+.PHONY: test test-versions test-contracts compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow
 test:
 	python -m pytest
 
@@ -36,3 +38,10 @@ compose-up-object-store:
 
 test-object-store:
 	python tests/integration/object_store/smoke_s3.py
+
+compose-up-mlflow: compose-up-postgres compose-up-object-store
+	docker compose up -d mlflow
+	bash config/mlflow/wait-for-mlflow.sh
+
+test-mlflow:
+	docker compose exec -T mlflow python /opt/mlflow/tests/smoke_mlflow.py
