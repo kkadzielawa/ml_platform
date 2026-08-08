@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/ml-platform-study/contracts/naming.schema.json",
+  "title": "ML Platform Naming Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "project",
+    "environment",
+    "dataset",
+    "model",
+    "run",
+    "artifact_prefixes",
+    "labels"
+  ],
+  "properties": {
+    "project": {
+      "$ref": "#/$defs/namedSlug"
+    },
+    "environment": {
+      "$ref": "#/$defs/namedSlug"
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/portableName"
+        },
+        "version": {
+          "$ref": "#/$defs/datasetVersion"
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/portableName"
+        },
+        "version": {
+          "$ref": "#/$defs/semanticVersion"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/runId"
+        }
+      }
+    },
+    "artifact_prefixes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["datasets", "models", "runs", "experiments"],
+      "properties": {
+        "datasets": {
+          "$ref": "#/$defs/objectPrefix"
+        },
+        "models": {
+          "$ref": "#/$defs/objectPrefix"
+        },
+        "runs": {
+          "$ref": "#/$defs/objectPrefix"
+        },
+        "experiments": {
+          "$ref": "#/$defs/objectPrefix"
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "app.kubernetes.io/name",
+        "app.kubernetes.io/part-of",
+        "ml-platform-study/phase",
+        "ml-platform-study/component",
+        "ml-platform-study/environment",
+        "ml-platform-study/owner"
+      ],
+      "properties": {
+        "app.kubernetes.io/name": {
+          "$ref": "#/$defs/portableName"
+        },
+        "app.kubernetes.io/part-of": {
+          "$ref": "#/$defs/portableName"
+        },
+        "ml-platform-study/phase": {
+          "type": "string",
+          "pattern": "^\\d{2}$"
+        },
+        "ml-platform-study/component": {
+          "$ref": "#/$defs/portableName"
+        },
+        "ml-platform-study/environment": {
+          "$ref": "#/$defs/portableName"
+        },
+        "ml-platform-study/owner": {
+          "$ref": "#/$defs/portableName"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "namedSlug": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/portableName"
+        }
+      }
+    },
+    "portableName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 63,
+      "pattern": "^(?!.*(?:password|passwd|secret|token|credential|apikey|api-key|email|user|konrad))[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "datasetVersion": {
+      "type": "string",
+      "pattern": "^v\\d{4}$"
+    },
+    "semanticVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^run-\\d{8}t\\d{6}z-[0-9a-f]{8}$"
+    },
+    "objectPrefix": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 256,
+      "pattern": "^(?!/)(?!.*//)(?!.*\\.\\.)(?!.*(?:password|passwd|secret|token|credential|apikey|api-key|email|user|konrad))[a-z0-9][a-z0-9/_=.-]*/$"
+    }
+  }
+}
