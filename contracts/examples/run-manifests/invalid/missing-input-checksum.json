@@ -1,0 +1,132 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "run-20260808t142233z-a1b2c3d4",
+  "owner": "study",
+  "project": "ml-platform",
+  "environment": "local",
+  "parent_run_id": null,
+  "timestamps": {
+    "started_at": "2026-08-08T14:22:33Z",
+    "finished_at": "2026-08-08T14:24:10Z"
+  },
+  "correlation": {
+    "trace_id": "0123456789abcdef0123456789abcdef",
+    "correlation_id": "local-classic-ml"
+  },
+  "code": {
+    "repository": "https://github.com/kkadzielawa/ml_platform",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "dirty_worktree": false,
+    "dependency_lockfile_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "images": {
+    "source": {
+      "repository": "docker.io/library/python",
+      "tag": "3.12.13-slim-bookworm",
+      "digest": "sha256:6e13e65c55e33adf203d77ee371cf8bf5d81bd4902ef07565721f46bf44917af",
+      "sbom": "s3://ml-platform-study/sbom/python-3.12.13.spdx.json",
+      "signature": "s3://ml-platform-study/signatures/python-3.12.13.sig"
+    },
+    "output": {
+      "repository": "docker.io/local/ml-platform-training",
+      "tag": "0.1.0",
+      "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "sbom": "s3://ml-platform-study/sbom/training-0.1.0.spdx.json",
+      "signature": "s3://ml-platform-study/signatures/training-0.1.0.sig"
+    }
+  },
+  "artifacts": {
+    "inputs": [
+      {
+        "name": "iris-classifier",
+        "kind": "dataset",
+        "uri": "s3://ml-platform-study/projects/ml-platform/datasets/iris-classifier/versions/v0001/data.parquet",
+        "schema_ref": "https://example.local/ml-platform-study/contracts/iris.schema.json",
+        "data_revision": {
+          "type": "lakefs-commit",
+          "id": "lakefscommit0001"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "iris-baseline",
+        "kind": "model",
+        "uri": "s3://ml-platform-study/projects/ml-platform/models/iris-baseline/versions/0.1.0/model.pkl",
+        "checksum": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+        "schema_ref": "https://example.local/ml-platform-study/contracts/model-artifact.schema.json",
+        "data_revision": {
+          "type": "object-version",
+          "id": "model-object-version-0001"
+        }
+      }
+    ]
+  },
+  "model": {
+    "name": "iris-baseline",
+    "version": "0.1.0",
+    "license": "BSD-3-Clause",
+    "tokenizer": null,
+    "embedding_model": null,
+    "prompt_version": null,
+    "index_version": null
+  },
+  "reproducibility": {
+    "hardware": {
+      "cpu": "intel-core-i7-7700hq",
+      "memory_gib": 16,
+      "gpu": null
+    },
+    "driver_runtime_versions": {
+      "python": "3.12.3",
+      "scikit-learn": "1.5.2"
+    },
+    "random_seeds": {
+      "python": 7,
+      "numpy": 7,
+      "split": 42
+    }
+  },
+  "parameters": {
+    "test_size": 0.2,
+    "max_iter": 200
+  },
+  "metrics": {
+    "accuracy": 0.93,
+    "p95_prediction_latency_ms": 37.5
+  },
+  "evaluation_results": [
+    {
+      "name": "heldout-accuracy",
+      "metric": "accuracy",
+      "value": 0.93,
+      "unit": "ratio",
+      "threshold": ">=0.85",
+      "passed": true
+    }
+  ],
+  "policy_decisions": [
+    {
+      "name": "license-check",
+      "decision": "allow",
+      "reason": "Dataset and model artifacts use approved study licenses."
+    }
+  ],
+  "approval": {
+    "required": true,
+    "approved_by": "study-reviewer",
+    "approved_at": "2026-08-08T14:25:00Z"
+  },
+  "lineage_events": [
+    {
+      "event_type": "trained",
+      "event_time": "2026-08-08T14:24:10Z",
+      "source": "s3://ml-platform-study/projects/ml-platform/datasets/iris-classifier/versions/v0001/data.parquet",
+      "target": "s3://ml-platform-study/projects/ml-platform/models/iris-baseline/versions/0.1.0/model.pkl"
+    }
+  ],
+  "retention": {
+    "security_classification": "internal",
+    "retain_until": "2027-08-08"
+  }
+}
