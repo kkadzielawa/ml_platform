@@ -1,0 +1,44 @@
+schema_version: "1.0.0"
+project: ml-platform
+owner: study
+environment: local
+
+dataset:
+  name: synthetic-housing-sale-classifier
+  version: v0001
+  train_path: examples/sklearn_baseline/data/train.csv
+  test_path: examples/sklearn_baseline/data/test.csv
+  metadata_path: examples/sklearn_baseline/data/metadata.json
+  license: CC0-1.0
+
+model:
+  name: housing-sale-baseline
+  version: 0.1.0
+  license: BSD-3-Clause
+  algorithm: gradient-boosting-classifier
+  parameters:
+    n_estimators: 80
+    max_depth: 1
+    learning_rate: 0.08
+    random_state: 20260808
+
+evaluation:
+  primary_metric: accuracy
+  minimum_accuracy: 0.67
+
+mlflow:
+  tracking_uri: http://127.0.0.1:5000
+  experiment_name: local-classic-ml
+  run_name: housing-sale-baseline
+
+runtime:
+  source_image:
+    repository: ghcr.io/mlflow/mlflow
+    tag: v3.13.0
+    digest: sha256:a5cd51cd14b570ec4374a4dad76a8ff92b7a0a6f66904c871cee18703487d23f
+  dependency_lockfile_path: config/versions.yaml
+  random_seed: 20260808
+
+retention:
+  security_classification: internal
+  retain_until: "2027-08-08"
