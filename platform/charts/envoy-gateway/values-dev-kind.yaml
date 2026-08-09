@@ -1,0 +1,25 @@
+deployment:
+  envoyGateway:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+certgen:
+  job:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+config:
+  envoyGateway:
+    logging:
+      level:
+        default: info

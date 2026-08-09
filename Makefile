@@ -27,8 +27,15 @@ export BASELINE_MODEL_NAME ?= housing-sale-baseline
 export BASELINE_SERVE_PORT ?= 18080
 export KIND_CLUSTER_NAME ?= ml-platform-study-dev
 export KIND_CONFIG ?= clusters/dev/kind/cluster.yaml
+export ENVOY_GATEWAY_VERSION ?= v1.8.3
+export ENVOY_GATEWAY_RELEASE ?= eg
+export ENVOY_GATEWAY_NAMESPACE ?= ml-platform-system
+export GATEWAY_HOST ?= gateway.ml-platform.local
+export GATEWAY_HTTP_PORT ?= 8080
+export HELM_RUNNER_IMAGE ?= docker.io/alpine/helm:3.18.6@sha256:b158d7f0fe1fb84abb59a15973ef25adf66affa2028a8328c083046c5ca04e91
+export KUBECONFIG ?= $(HOME)/.kube/config
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway
 test:
 	python -m pytest
 
@@ -106,3 +113,15 @@ apply-namespaces: cluster-status
 	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/quotas
 	kubectl --context kind-$(KIND_CLUSTER_NAME) apply --dry-run=server -f tests/manifests/fixtures/project-pod-with-resources.yaml
 	@if kubectl --context kind-$(KIND_CLUSTER_NAME) apply --dry-run=server -f tests/manifests/fixtures/project-pod-without-resources.yaml >/tmp/ml-platform-unresourced-pod.out 2>&1; then cat /tmp/ml-platform-unresourced-pod.out; echo "expected unresourced project pod to be rejected"; exit 1; else cat /tmp/ml-platform-unresourced-pod.out; echo "project namespace rejects pods without explicit resources"; fi
+
+apply-gateway: apply-namespaces
+	@if command -v helm >/dev/null; then helm upgrade --install $(ENVOY_GATEWAY_RELEASE) oci://docker.io/envoyproxy/gateway-helm --version $(ENVOY_GATEWAY_VERSION) --namespace $(ENVOY_GATEWAY_NAMESPACE) --create-namespace --values platform/charts/envoy-gateway/values-dev-kind.yaml; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(ENVOY_GATEWAY_RELEASE) oci://docker.io/envoyproxy/gateway-helm --version $(ENVOY_GATEWAY_VERSION) --namespace $(ENVOY_GATEWAY_NAMESPACE) --create-namespace --values platform/charts/envoy-gateway/values-dev-kind.yaml; fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(ENVOY_GATEWAY_NAMESPACE) deployment/envoy-gateway --for=condition=Available
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/gateway
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m --namespace ml-platform-project-housing deployment/gateway-echo --for=condition=Available
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m gatewayclass/ml-platform-envoy --for=condition=Accepted
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m --namespace $(ENVOY_GATEWAY_NAMESPACE) gateway/ml-platform-local --for=condition=Programmed
+	@echo "Gateway route: curl -H 'Host: $(GATEWAY_HOST)' http://127.0.0.1:$(GATEWAY_HTTP_PORT)/gateway-echo"
+
+test-gateway:
+	RUN_GATEWAY_INTEGRATION=1 GATEWAY_HOST=$(GATEWAY_HOST) GATEWAY_HTTP_PORT=$(GATEWAY_HTTP_PORT) KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) python -m pytest tests/integration/gateway

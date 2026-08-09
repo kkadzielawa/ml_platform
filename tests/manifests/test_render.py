@@ -13,6 +13,7 @@ KUSTOMIZE_ENTRIES = [
     REPO_ROOT / "clusters" / "base",
     REPO_ROOT / "clusters" / "base" / "namespaces",
     REPO_ROOT / "clusters" / "dev" / "kind",
+    REPO_ROOT / "clusters" / "dev" / "gateway",
     REPO_ROOT / "clusters" / "dev" / "quotas",
 ]
 BASE_FORBIDDEN_STRINGS = [
