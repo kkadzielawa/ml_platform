@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: platform-container-bounds
+  namespace: ml-platform-system
+  labels:
+    ml-platform.local/namespace-class: platform
+    ml-platform.local/owner: platform-team
+spec:
+  limits:
+    - type: Container
+      min:
+        cpu: 10m
+        memory: 32Mi
+      max:
+        cpu: "2"
+        memory: 3Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: platform-container-bounds
+  namespace: ml-platform-data
+  labels:
+    ml-platform.local/namespace-class: platform
+    ml-platform.local/owner: platform-team
+spec:
+  limits:
+    - type: Container
+      min:
+        cpu: 10m
+        memory: 32Mi
+      max:
+        cpu: "2"
+        memory: 4Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: platform-container-bounds
+  namespace: ml-platform-observability
+  labels:
+    ml-platform.local/namespace-class: platform
+    ml-platform.local/owner: platform-team
+spec:
+  limits:
+    - type: Container
+      min:
+        cpu: 10m
+        memory: 32Mi
+      max:
+        cpu: "2"
+        memory: 3Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: project-container-bounds
+  namespace: ml-platform-project-housing
+  labels:
+    ml-platform.local/namespace-class: project
+    ml-platform.local/owner: project-housing
+spec:
+  limits:
+    - type: Container
+      min:
+        cpu: 10m
+        memory: 32Mi

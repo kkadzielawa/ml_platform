@@ -168,6 +168,80 @@ make cluster-create && make cluster-status
 
 stable instead of timing-sensitive.
 
+
+## Kubernetes admission policy did not reject project pods
+
+### Symptom
+
+During `01.04`, we wanted project namespaces to reject pods without explicit CPU and memory resources. A `ValidatingAdmissionPolicy` rendered and applied successfully, but both server dry-run and real pod creation still allowed an unresourced pod.
+
+```text
+pod/quota-rejects-unresourced-pod created
+```
+
+### Cause
+
+The kind API server was not running the admission plugin needed to enforce `ValidatingAdmissionPolicy`. Its flags showed only:
+
+```text
+--enable-admission-plugins=NodeRestriction
+```
+
+So the policy object existed, but it was inert for this cluster. We also saw CEL type-checking warnings while experimenting with resource field expressions, which made the policy path more fragile than necessary for this issue.
+
+### Resolution
+
+Use native `ResourceQuota` behavior instead of a custom admission policy for this issue. The project namespace now has normal compute quotas plus a quota scoped to `BestEffort` pods:
+
+```yaml
+spec:
+  hard:
+    pods: "0"
+  scopes:
+    - BestEffort
+```
+
+A pod with no resource requests/limits is BestEffort, so Kubernetes rejects it once no implicit defaults are added.
+
+## LimitRange silently defaulted missing resources
+
+### Symptom
+
+After adding the `BestEffort` quota, an unresourced pod was still admitted. The quota existed and showed `pods: 0` for `BestEffort`, but the supposedly unresourced pod did not count as BestEffort.
+
+### Cause
+
+The project `LimitRange` included only `min` and `max`. Kubernetes defaulted missing `default` and `defaultRequest` values from the `max` values:
+
+```yaml
+default:
+  cpu: "1"
+  memory: 2Gi
+defaultRequest:
+  cpu: "1"
+  memory: 2Gi
+```
+
+That silently turned an unresourced pod into a resourced pod, bypassing the BestEffort quota.
+
+### Resolution
+
+For the project namespace, remove the `max` from the `LimitRange` and keep only the minimum container bounds. That prevents Kubernetes from defaulting missing requests/limits. The `ResourceQuota` requiring `requests.*` and `limits.*` then rejects pods that omit explicit resources.
+
+The final behavior is:
+
+```text
+resourced pod: accepted
+unresourced pod: rejected by ResourceQuota
+```
+
+The verification output includes:
+
+```text
+failed quota: project-housing-quota: must specify limits.cpu ... limits.memory ...
+project namespace rejects pods without explicit resources
+```
+
 ## General debugging pattern that worked
 
 When kind creation failed, the useful path was:

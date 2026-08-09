@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base/namespaces
+  - limitranges.yaml
+  - resourcequotas.yaml
+labels:
+  - pairs:
+      ml-platform.local/environment: dev
+      ml-platform.local/cluster-route: kind
+    includeSelectors: false

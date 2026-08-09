@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-platform-system
+  labels:
+    app.kubernetes.io/name: ml-platform-system
+    app.kubernetes.io/part-of: ml-platform-study
+    ml-platform.local/namespace-class: platform
+    ml-platform.local/owner: platform-team
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-platform-data
+  labels:
+    app.kubernetes.io/name: ml-platform-data
+    app.kubernetes.io/part-of: ml-platform-study
+    ml-platform.local/namespace-class: platform
+    ml-platform.local/owner: platform-team
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-platform-observability
+  labels:
+    app.kubernetes.io/name: ml-platform-observability
+    app.kubernetes.io/part-of: ml-platform-study
+    ml-platform.local/namespace-class: platform
+    ml-platform.local/owner: platform-team
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-platform-project-housing
+  labels:
+    app.kubernetes.io/name: ml-platform-project-housing
+    app.kubernetes.io/part-of: ml-platform-study
+    ml-platform.local/namespace-class: project
+    ml-platform.local/owner: project-housing
+

@@ -28,7 +28,7 @@ export BASELINE_SERVE_PORT ?= 18080
 export KIND_CLUSTER_NAME ?= ml-platform-study-dev
 export KIND_CONFIG ?= clusters/dev/kind/cluster.yaml
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces
 test:
 	python -m pytest
 
@@ -101,3 +101,8 @@ cluster-status:
 
 cluster-delete:
 	bash scripts/cluster/delete-kind.sh
+
+apply-namespaces: cluster-status
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/quotas
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply --dry-run=server -f tests/manifests/fixtures/project-pod-with-resources.yaml
+	@if kubectl --context kind-$(KIND_CLUSTER_NAME) apply --dry-run=server -f tests/manifests/fixtures/project-pod-without-resources.yaml >/tmp/ml-platform-unresourced-pod.out 2>&1; then cat /tmp/ml-platform-unresourced-pod.out; echo "expected unresourced project pod to be rejected"; exit 1; else cat /tmp/ml-platform-unresourced-pod.out; echo "project namespace rejects pods without explicit resources"; fi
