@@ -1,0 +1,16 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ml-platform-selfsigned-bootstrap
+  namespace: ml-platform-system
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ml-platform-local-ca
+  namespace: ml-platform-system
+spec:
+  ca:
+    secretName: ml-platform-local-ca

@@ -34,8 +34,14 @@ export GATEWAY_HOST ?= gateway.ml-platform.local
 export GATEWAY_HTTP_PORT ?= 8080
 export HELM_RUNNER_IMAGE ?= docker.io/alpine/helm:3.18.6@sha256:b158d7f0fe1fb84abb59a15973ef25adf66affa2028a8328c083046c5ca04e91
 export KUBECONFIG ?= $(HOME)/.kube/config
+export CERT_MANAGER_VERSION ?= v1.21.0
+export CERT_MANAGER_RELEASE ?= cert-manager
+export CERT_MANAGER_NAMESPACE ?= ml-platform-system
+export CERT_MANAGER_CHART ?= oci://quay.io/jetstack/charts/cert-manager
+export GATEWAY_HTTPS_PORT ?= 8443
+export TLS_CA_BUNDLE ?= /tmp/ml-platform-local-ca.crt
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls
 test:
 	python -m pytest
 
@@ -125,3 +131,16 @@ apply-gateway: apply-namespaces
 
 test-gateway:
 	RUN_GATEWAY_INTEGRATION=1 GATEWAY_HOST=$(GATEWAY_HOST) GATEWAY_HTTP_PORT=$(GATEWAY_HTTP_PORT) KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) python -m pytest tests/integration/gateway
+
+apply-tls: apply-gateway
+	@if command -v helm >/dev/null; then helm upgrade --install $(CERT_MANAGER_RELEASE) $(CERT_MANAGER_CHART) --version $(CERT_MANAGER_VERSION) --namespace $(CERT_MANAGER_NAMESPACE) --create-namespace --values platform/charts/cert-manager/values-dev-kind.yaml --wait --timeout 5m; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(CERT_MANAGER_RELEASE) $(CERT_MANAGER_CHART) --version $(CERT_MANAGER_VERSION) --namespace $(CERT_MANAGER_NAMESPACE) --create-namespace --values platform/charts/cert-manager/values-dev-kind.yaml --wait --timeout 5m; fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/tls
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m --namespace $(CERT_MANAGER_NAMESPACE) certificate/ml-platform-local-ca --for=condition=Ready
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m --namespace $(CERT_MANAGER_NAMESPACE) certificate/gateway-echo-tls --for=condition=Ready
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m --namespace $(ENVOY_GATEWAY_NAMESPACE) gateway/ml-platform-local --for=condition=Programmed
+	kubectl --context kind-$(KIND_CLUSTER_NAME) get secret ml-platform-local-ca --namespace $(CERT_MANAGER_NAMESPACE) --output=jsonpath='{.data.ca\.crt}' | base64 --decode > "$(TLS_CA_BUNDLE)"
+	@echo "Local CA bundle written to $(TLS_CA_BUNDLE)"
+	@echo "HTTPS route: curl --cacert $(TLS_CA_BUNDLE) --resolve $(GATEWAY_HOST):$(GATEWAY_HTTPS_PORT):127.0.0.1 https://$(GATEWAY_HOST):$(GATEWAY_HTTPS_PORT)/gateway-echo"
+
+test-tls:
+	RUN_TLS_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) GATEWAY_HOST=$(GATEWAY_HOST) GATEWAY_HTTP_PORT=$(GATEWAY_HTTP_PORT) GATEWAY_HTTPS_PORT=$(GATEWAY_HTTPS_PORT) TLS_CA_BUNDLE=$(TLS_CA_BUNDLE) python -m pytest tests/integration/tls

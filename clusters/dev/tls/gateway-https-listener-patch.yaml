@@ -1,0 +1,16 @@
+- op: add
+  path: /spec/listeners/-
+  value:
+    name: https
+    hostname: gateway.ml-platform.local
+    port: 443
+    protocol: HTTPS
+    tls:
+      mode: Terminate
+      certificateRefs:
+        - group: ""
+          kind: Secret
+          name: gateway-echo-tls
+    allowedRoutes:
+      namespaces:
+        from: All

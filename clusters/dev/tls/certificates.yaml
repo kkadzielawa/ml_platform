@@ -1,0 +1,42 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ml-platform-local-ca
+  namespace: ml-platform-system
+spec:
+  secretName: ml-platform-local-ca
+  isCA: true
+  commonName: ml-platform-study-local-ca
+  duration: 8760h
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: ml-platform-selfsigned-bootstrap
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gateway-echo-tls
+  namespace: ml-platform-system
+spec:
+  secretName: gateway-echo-tls
+  commonName: gateway.ml-platform.local
+  dnsNames:
+    - gateway.ml-platform.local
+  ipAddresses:
+    - 127.0.0.1
+  duration: 2160h
+  renewBefore: 360h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+  issuerRef:
+    name: ml-platform-local-ca
+    kind: Issuer
