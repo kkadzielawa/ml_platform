@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: garage-bootstrap
+  namespace: ml-platform-data
+  labels:
+    app.kubernetes.io/name: garage
+    app.kubernetes.io/component: bootstrap
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: garage
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        ml-platform.local/workload-class: platform
+      containers:
+        - name: bootstrap-marker
+          image: docker.io/dxflrs/garage:v2.0.0@sha256:df71920098b2728cda596c4362cd6316345f6791240b2c2aff8aa34668f99b6d
+          command:
+            - /garage
+          args:
+            - --version
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi

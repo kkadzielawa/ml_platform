@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage
+  namespace: ml-platform-data
+  labels:
+    app.kubernetes.io/name: garage
+    app.kubernetes.io/component: object-storage
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: garage
+  ports:
+    - name: rpc
+      port: 3901
+      targetPort: rpc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage-s3
+  namespace: ml-platform-data
+  labels:
+    app.kubernetes.io/name: garage
+    app.kubernetes.io/component: object-storage
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: garage
+  ports:
+    - name: s3
+      port: 3900
+      targetPort: s3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage-admin
+  namespace: ml-platform-data
+  labels:
+    app.kubernetes.io/name: garage
+    app.kubernetes.io/component: object-storage
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: garage
+  ports:
+    - name: admin
+      port: 3903
+      targetPort: admin

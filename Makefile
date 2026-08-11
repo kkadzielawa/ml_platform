@@ -50,8 +50,10 @@ export CLUSTER_POSTGRES_NAMESPACE ?= ml-platform-data
 export CLUSTER_POSTGRES_DATABASE ?= study_app
 export CLUSTER_POSTGRES_USER ?= study_app
 export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
+export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
+export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage
 test:
 	python -m pytest
 
@@ -170,3 +172,17 @@ apply-postgres: apply-namespaces
 
 test-cluster-postgres:
 	RUN_CLOUDNATIVEPG_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) CLUSTER_POSTGRES_NAME=$(CLUSTER_POSTGRES_NAME) CLUSTER_POSTGRES_NAMESPACE=$(CLUSTER_POSTGRES_NAMESPACE) CLUSTER_POSTGRES_DATABASE=$(CLUSTER_POSTGRES_DATABASE) CLUSTER_POSTGRES_USER=$(CLUSTER_POSTGRES_USER) python -m pytest tests/integration/cloudnativepg
+
+apply-object-storage: apply-namespaces
+	kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic garage-credentials --namespace $(CLUSTER_GARAGE_NAMESPACE) --from-literal=rpc-secret="$(GARAGE_RPC_SECRET)" --from-literal=admin-token="$(GARAGE_ADMIN_TOKEN)" --from-literal=metrics-token="$(GARAGE_METRICS_TOKEN)" --from-literal=access-key-id="$(GARAGE_KEY_ID)" --from-literal=secret-access-key="$(GARAGE_SECRET_KEY)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	kubectl --context kind-$(KIND_CLUSTER_NAME) delete job garage-bootstrap --namespace $(CLUSTER_GARAGE_NAMESPACE) --ignore-not-found=true
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/storage
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(CLUSTER_GARAGE_NAMESPACE) statefulset/garage --for=jsonpath='{.status.readyReplicas}'=1
+	bash clusters/dev/storage/bootstrap-garage.sh
+	kubectl --context kind-$(KIND_CLUSTER_NAME) delete job garage-bootstrap --namespace $(CLUSTER_GARAGE_NAMESPACE) --ignore-not-found=true
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f clusters/dev/storage/bootstrap-job.yaml
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(CLUSTER_GARAGE_NAMESPACE) job/garage-bootstrap --for=condition=Complete
+	@echo "Garage S3 service: garage-s3.$(CLUSTER_GARAGE_NAMESPACE).svc.cluster.local:3900"
+
+test-cluster-object-storage:
+	RUN_CLUSTER_OBJECT_STORE_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) CLUSTER_GARAGE_NAMESPACE=$(CLUSTER_GARAGE_NAMESPACE) CLUSTER_GARAGE_PORT=$(CLUSTER_GARAGE_PORT) GARAGE_BUCKET=$(GARAGE_BUCKET) GARAGE_KEY_ID=$(GARAGE_KEY_ID) GARAGE_SECRET_KEY=$(GARAGE_SECRET_KEY) GARAGE_S3_REGION=$(GARAGE_S3_REGION) GARAGE_S3_ENDPOINT=http://127.0.0.1:$(CLUSTER_GARAGE_PORT) python -m pytest tests/integration/object_store
