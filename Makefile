@@ -40,8 +40,18 @@ export CERT_MANAGER_NAMESPACE ?= ml-platform-system
 export CERT_MANAGER_CHART ?= oci://quay.io/jetstack/charts/cert-manager
 export GATEWAY_HTTPS_PORT ?= 8443
 export TLS_CA_BUNDLE ?= /tmp/ml-platform-local-ca.crt
+export CLOUDNATIVEPG_CHART_VERSION ?= 0.29.0
+export CLOUDNATIVEPG_APP_VERSION ?= 1.30.0
+export CLOUDNATIVEPG_RELEASE ?= cnpg
+export CLOUDNATIVEPG_NAMESPACE ?= ml-platform-system
+export CLOUDNATIVEPG_CHART_REPO ?= https://cloudnative-pg.github.io/charts
+export CLUSTER_POSTGRES_NAME ?= study-postgres
+export CLUSTER_POSTGRES_NAMESPACE ?= ml-platform-data
+export CLUSTER_POSTGRES_DATABASE ?= study_app
+export CLUSTER_POSTGRES_USER ?= study_app
+export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres
 test:
 	python -m pytest
 
@@ -150,3 +160,13 @@ apply-network-policy: apply-namespaces
 
 test-network-policy:
 	RUN_NETWORK_POLICY_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) python -m pytest tests/integration/network
+
+apply-postgres: apply-namespaces
+	@if command -v helm >/dev/null; then helm upgrade --install $(CLOUDNATIVEPG_RELEASE) cloudnative-pg --repo $(CLOUDNATIVEPG_CHART_REPO) --version $(CLOUDNATIVEPG_CHART_VERSION) --namespace $(CLOUDNATIVEPG_NAMESPACE) --create-namespace --values platform/charts/cloudnativepg/values-dev-kind.yaml --wait --timeout 5m; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(CLOUDNATIVEPG_RELEASE) cloudnative-pg --repo $(CLOUDNATIVEPG_CHART_REPO) --version $(CLOUDNATIVEPG_CHART_VERSION) --namespace $(CLOUDNATIVEPG_NAMESPACE) --create-namespace --values platform/charts/cloudnativepg/values-dev-kind.yaml --wait --timeout 5m; fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic $(CLUSTER_POSTGRES_NAME)-app --namespace $(CLUSTER_POSTGRES_NAMESPACE) --type=kubernetes.io/basic-auth --from-literal=username="$(CLUSTER_POSTGRES_USER)" --from-literal=password="$(CLUSTER_POSTGRES_PASSWORD)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/databases
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(CLUSTER_POSTGRES_NAMESPACE) cluster/$(CLUSTER_POSTGRES_NAME) --for=condition=Ready
+	@echo "CloudNativePG cluster: $(CLUSTER_POSTGRES_NAME).rw.$(CLUSTER_POSTGRES_NAMESPACE).svc.cluster.local:5432/$(CLUSTER_POSTGRES_DATABASE)"
+
+test-cluster-postgres:
+	RUN_CLOUDNATIVEPG_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) CLUSTER_POSTGRES_NAME=$(CLUSTER_POSTGRES_NAME) CLUSTER_POSTGRES_NAMESPACE=$(CLUSTER_POSTGRES_NAMESPACE) CLUSTER_POSTGRES_DATABASE=$(CLUSTER_POSTGRES_DATABASE) CLUSTER_POSTGRES_USER=$(CLUSTER_POSTGRES_USER) python -m pytest tests/integration/cloudnativepg

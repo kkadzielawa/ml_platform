@@ -1,0 +1,28 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: study-postgres
+  namespace: ml-platform-data
+  labels:
+    app.kubernetes.io/name: study-postgres
+    app.kubernetes.io/component: database
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.10-system-trixie@sha256:dea92d39d38abf4d87c0b0bd43cbf956dc2de03db3a78b5829ac629ef296b8e1
+  enableSuperuserAccess: false
+  bootstrap:
+    initdb:
+      database: study_app
+      owner: study_app
+      secret:
+        name: study-postgres-app
+  primaryUpdateStrategy: unsupervised
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  storage:
+    size: 1Gi
