@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - project-default-deny.yaml
+  - project-allow-dns-egress.yaml
+  - project-allow-gateway-ingress.yaml
+  - project-allow-network-test.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: ml-platform-study
+      app.kubernetes.io/managed-by: kustomize
+      ml-platform.local/lifecycle: study
+    includeSelectors: false

@@ -1,0 +1,10 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: project-default-deny
+  namespace: ml-platform-project-housing
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

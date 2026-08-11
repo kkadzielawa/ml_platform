@@ -41,7 +41,7 @@ export CERT_MANAGER_CHART ?= oci://quay.io/jetstack/charts/cert-manager
 export GATEWAY_HTTPS_PORT ?= 8443
 export TLS_CA_BUNDLE ?= /tmp/ml-platform-local-ca.crt
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy
 test:
 	python -m pytest
 
@@ -144,3 +144,9 @@ apply-tls: apply-gateway
 
 test-tls:
 	RUN_TLS_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) GATEWAY_HOST=$(GATEWAY_HOST) GATEWAY_HTTP_PORT=$(GATEWAY_HTTP_PORT) GATEWAY_HTTPS_PORT=$(GATEWAY_HTTPS_PORT) TLS_CA_BUNDLE=$(TLS_CA_BUNDLE) python -m pytest tests/integration/tls
+
+apply-network-policy: apply-namespaces
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/base/network-policies
+
+test-network-policy:
+	RUN_NETWORK_POLICY_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) python -m pytest tests/integration/network
