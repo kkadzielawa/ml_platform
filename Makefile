@@ -45,6 +45,15 @@ export CLOUDNATIVEPG_APP_VERSION ?= 1.30.0
 export CLOUDNATIVEPG_RELEASE ?= cnpg
 export CLOUDNATIVEPG_NAMESPACE ?= ml-platform-system
 export CLOUDNATIVEPG_CHART_REPO ?= https://cloudnative-pg.github.io/charts
+export HARBOR_CHART_VERSION ?= 1.19.1
+export HARBOR_APP_VERSION ?= 2.15.1
+export HARBOR_RELEASE ?= harbor
+export HARBOR_NAMESPACE ?= ml-platform-system
+export HARBOR_CHART_REPO ?= https://helm.goharbor.io
+export HARBOR_ADMIN_USER ?= admin
+export HARBOR_ADMIN_PASSWORD ?= local-dev-harbor-password
+export CLUSTER_REGISTRY_HOST ?= 127.0.0.1:15000
+export CLUSTER_REGISTRY_PORT ?= 15000
 export CLUSTER_POSTGRES_NAME ?= study-postgres
 export CLUSTER_POSTGRES_NAMESPACE ?= ml-platform-data
 export CLUSTER_POSTGRES_DATABASE ?= study_app
@@ -53,7 +62,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry
 test:
 	python -m pytest
 
@@ -186,3 +195,14 @@ apply-object-storage: apply-namespaces
 
 test-cluster-object-storage:
 	RUN_CLUSTER_OBJECT_STORE_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) CLUSTER_GARAGE_NAMESPACE=$(CLUSTER_GARAGE_NAMESPACE) CLUSTER_GARAGE_PORT=$(CLUSTER_GARAGE_PORT) GARAGE_BUCKET=$(GARAGE_BUCKET) GARAGE_KEY_ID=$(GARAGE_KEY_ID) GARAGE_SECRET_KEY=$(GARAGE_SECRET_KEY) GARAGE_S3_REGION=$(GARAGE_S3_REGION) GARAGE_S3_ENDPOINT=http://127.0.0.1:$(CLUSTER_GARAGE_PORT) python -m pytest tests/integration/object_store
+
+apply-registry: apply-namespaces
+	kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic harbor-admin --namespace $(HARBOR_NAMESPACE) --from-literal=HARBOR_ADMIN_PASSWORD="$(HARBOR_ADMIN_PASSWORD)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	@if command -v helm >/dev/null; then helm upgrade --install $(HARBOR_RELEASE) harbor --repo $(HARBOR_CHART_REPO) --version $(HARBOR_CHART_VERSION) --namespace $(HARBOR_NAMESPACE) --create-namespace --values platform/charts/harbor/values-dev-kind.yaml --set externalURL=http://$(CLUSTER_REGISTRY_HOST); else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(HARBOR_RELEASE) harbor --repo $(HARBOR_CHART_REPO) --version $(HARBOR_CHART_VERSION) --namespace $(HARBOR_NAMESPACE) --create-namespace --values platform/charts/harbor/values-dev-kind.yaml --set externalURL=http://$(CLUSTER_REGISTRY_HOST); fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) rollout status deployment/$(HARBOR_RELEASE)-registry --namespace $(HARBOR_NAMESPACE) --timeout=5m
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(HARBOR_NAMESPACE) deployment/$(HARBOR_RELEASE)-core --for=condition=Available
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(HARBOR_NAMESPACE) deployment/$(HARBOR_RELEASE)-nginx --for=condition=Available
+	@echo "Harbor registry: http://$(CLUSTER_REGISTRY_HOST)"
+
+test-registry:
+	RUN_REGISTRY_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) HARBOR_NAMESPACE=$(HARBOR_NAMESPACE) HARBOR_ADMIN_USER=$(HARBOR_ADMIN_USER) HARBOR_ADMIN_PASSWORD=$(HARBOR_ADMIN_PASSWORD) CLUSTER_REGISTRY_HOST=$(CLUSTER_REGISTRY_HOST) CLUSTER_REGISTRY_PORT=$(CLUSTER_REGISTRY_PORT) python -m pytest tests/integration/registry
