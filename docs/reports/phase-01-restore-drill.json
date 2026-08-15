@@ -1,0 +1,74 @@
+{
+  "backup_name": "phase-01-20260815125526",
+  "elapsed_seconds": 18.926,
+  "gaps": [
+    "This drill restores a scoped namespace, not the whole cluster.",
+    "Kubernetes Secrets remain excluded from the Velero backup and restore.",
+    "The SQL check restores a fixture row into a suffixed table; it is not point-in-time database recovery.",
+    "The object check restores a fixture object into a suffixed key; it is not native Garage disaster recovery.",
+    "Harbor image blob recovery is not exercised by this drill."
+  ],
+  "generated_at": "2026-08-15T12:55:37.460553+00:00",
+  "issue": "01.12",
+  "kubernetes": {
+    "resources": [
+      {
+        "kind": "Deployment",
+        "name": "gateway-echo",
+        "namespace": "ml-platform-project-housing-restored-01-12"
+      },
+      {
+        "kind": "HTTPRoute",
+        "name": "gateway-echo",
+        "namespace": "ml-platform-project-housing-restored-01-12"
+      },
+      {
+        "kind": "HTTPRoute",
+        "name": "gateway-echo-http-redirect",
+        "namespace": "ml-platform-project-housing-restored-01-12"
+      },
+      {
+        "kind": "LimitRange",
+        "name": "project-container-bounds",
+        "namespace": "ml-platform-project-housing-restored-01-12"
+      },
+      {
+        "kind": "ResourceQuota",
+        "name": "project-housing-no-besteffort-pods",
+        "namespace": "ml-platform-project-housing-restored-01-12"
+      },
+      {
+        "kind": "ResourceQuota",
+        "name": "project-housing-quota",
+        "namespace": "ml-platform-project-housing-restored-01-12"
+      },
+      {
+        "kind": "Service",
+        "name": "gateway-echo",
+        "namespace": "ml-platform-project-housing-restored-01-12"
+      }
+    ],
+    "restore_pvs": false,
+    "restored_namespace": "ml-platform-project-housing-restored-01-12",
+    "source_namespace": "ml-platform-project-housing"
+  },
+  "object": {
+    "backup_checksum": "fb8891a59afd92456c0a24f7701d5a6f3c28493bd6e973700e939411e232c216",
+    "bucket": "ml-platform-artifacts",
+    "matches_backup": true,
+    "restored_checksum": "fb8891a59afd92456c0a24f7701d5a6f3c28493bd6e973700e939411e232c216",
+    "restored_key": "restore-drill/restored-01-12/phase-01-restore-drill.txt",
+    "source_key": "restore-drill/source/phase-01-restore-drill.txt"
+  },
+  "original_resources_untouched": true,
+  "restore_name": "phase-01-restore-drill-20260815125548",
+  "sql": {
+    "backup_checksum": "15a579bb61d94904dbd82fe52a200443b02300553194e52309b03ec3d7143d1e",
+    "database": "study_app",
+    "matches_backup": true,
+    "restored_checksum": "15a579bb61d94904dbd82fe52a200443b02300553194e52309b03ec3d7143d1e",
+    "restored_table": "public.restore_drill_fixture_restored_01_12",
+    "row_id": "phase-01-restore-drill",
+    "source_table": "public.restore_drill_fixture"
+  }
+}

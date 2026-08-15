@@ -68,7 +68,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01
 test:
 	python -m pytest
 
@@ -213,7 +213,7 @@ apply-registry: apply-namespaces
 test-registry:
 	RUN_REGISTRY_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) HARBOR_NAMESPACE=$(HARBOR_NAMESPACE) HARBOR_ADMIN_USER=$(HARBOR_ADMIN_USER) HARBOR_ADMIN_PASSWORD=$(HARBOR_ADMIN_PASSWORD) CLUSTER_REGISTRY_HOST=$(CLUSTER_REGISTRY_HOST) CLUSTER_REGISTRY_PORT=$(CLUSTER_REGISTRY_PORT) python -m pytest tests/integration/registry
 
-backup-phase-01: apply-postgres apply-registry
+backup-phase-01: apply-postgres apply-object-storage apply-registry
 	kubectl --context kind-$(KIND_CLUSTER_NAME) create namespace $(VELERO_NAMESPACE) --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
 	@set -e; credential_file=$$(mktemp); printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' "$(GARAGE_KEY_ID)" "$(GARAGE_SECRET_KEY)" > "$$credential_file"; kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic velero-credentials --namespace $(VELERO_NAMESPACE) --from-file=cloud="$$credential_file" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -; rm -f "$$credential_file"
 	@if command -v helm >/dev/null; then helm upgrade --install $(VELERO_RELEASE) velero --repo $(VELERO_CHART_REPO) --version $(VELERO_CHART_VERSION) --namespace $(VELERO_NAMESPACE) --create-namespace --values platform/charts/velero/values-dev-kind.yaml; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(VELERO_RELEASE) velero --repo $(VELERO_CHART_REPO) --version $(VELERO_CHART_VERSION) --namespace $(VELERO_NAMESPACE) --create-namespace --values platform/charts/velero/values-dev-kind.yaml; fi
@@ -223,3 +223,7 @@ backup-phase-01: apply-postgres apply-registry
 verify-backup-phase-01:
 	bash scripts/backup/inventory-phase-01-backup.sh
 	@RUN_PHASE_01_BACKUP_VERIFY=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) VELERO_NAMESPACE=$(VELERO_NAMESPACE) GARAGE_BUCKET=$(GARAGE_BUCKET) GARAGE_KEY_ID=$(GARAGE_KEY_ID) GARAGE_SECRET_KEY=$(GARAGE_SECRET_KEY) HARBOR_ADMIN_PASSWORD=$(HARBOR_ADMIN_PASSWORD) CLUSTER_POSTGRES_PASSWORD=$(CLUSTER_POSTGRES_PASSWORD) python -m pytest tests/dr
+
+restore-drill-phase-01: backup-phase-01
+	python -m tests.dr.phase_01.restore_drill
+	@RUN_PHASE_01_RESTORE_DRILL=1 python -m pytest tests/dr/phase_01
