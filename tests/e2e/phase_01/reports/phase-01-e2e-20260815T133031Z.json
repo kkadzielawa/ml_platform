@@ -1,0 +1,158 @@
+{
+  "cluster_name": "ml-platform-study-dev",
+  "elapsed_seconds": 1300.235,
+  "generated_at": "2026-08-15T13:30:31.833771+00:00",
+  "issue": "01.13",
+  "reports": {
+    "latest": "tests/e2e/phase_01/reports/latest.json",
+    "timestamped": "tests/e2e/phase_01/reports/phase-01-e2e-20260815T133031Z.json"
+  },
+  "safe_delete_guard": {
+    "unexpected_cluster_name_refused": true,
+    "validated_by_step": "delete_guard_refuses_unexpected_cluster_name"
+  },
+  "status": "passed",
+  "steps": [
+    {
+      "command": "KIND_CLUSTER_NAME=not-the-study-cluster bash scripts/cluster/delete-kind.sh",
+      "elapsed_seconds": 0.005,
+      "expected_failure": true,
+      "name": "delete_guard_refuses_unexpected_cluster_name",
+      "returncode": 1,
+      "stderr_tail": "error: refusing unexpected cluster name 'not-the-study-cluster'; expected 'ml-platform-study-dev'",
+      "stdout_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "scripts/cluster/delete-kind.sh"
+      ],
+      "elapsed_seconds": 0.045,
+      "name": "delete_existing_exact_cluster",
+      "returncode": 0,
+      "stderr_tail": "",
+      "stdout_tail": "kind cluster 'ml-platform-study-dev' does not exist"
+    },
+    {
+      "command": [
+        "make",
+        "cluster-create"
+      ],
+      "elapsed_seconds": 50.875,
+      "name": "create_cluster_from_absent_state",
+      "returncode": 0,
+      "stderr_tail": "Creating cluster \"ml-platform-study-dev\" ...\n \u2022 Ensuring node image (kindest/node:v1.34.0) \ud83d\uddbc  ...\n \u2713 Ensuring node image (kindest/node:v1.34.0) \ud83d\uddbc\n \u2022 Preparing nodes \ud83d\udce6 \ud83d\udce6 \ud83d\udce6   ...\n \u2713 Preparing nodes \ud83d\udce6 \ud83d\udce6 \ud83d\udce6 \n \u2022 Writing configuration \ud83d\udcdc  ...\n \u2713 Writing configuration \ud83d\udcdc\n \u2022 Starting control-plane \ud83d\udd79\ufe0f  ...\n \u2713 Starting control-plane \ud83d\udd79\ufe0f\n \u2022 Installing CNI \ud83d\udd0c  ...\n \u2713 Installing CNI \ud83d\udd0c\n \u2022 Installing StorageClass \ud83d\udcbe  ...\n \u2713 Installing StorageClass \ud83d\udcbe\n \u2022 Joining worker nodes \ud83d\ude9c  ...\n \u2713 Joining worker nodes \ud83d\ude9c\n \u2022 Waiting \u2264 2m0s for control-plane = Ready \u23f3  ...\n \u2713 Waiting \u2264 2m0s for control-plane = Ready \u23f3\n \u2022 Ready after 7s \ud83d\udc9a\nSet kubectl context to \"kind-ml-platform-study-dev\"\nYou can now use your cluster with:\n\nkubectl cluster-info --context kind-ml-platform-study-dev\n\nHave a nice day! \ud83d\udc4b",
+      "stdout_tail": "make[1]: Entering directory '/home/konrad/Desktop/projects/ml_platform'\nbash scripts/cluster/create-kind.sh\nnode/ml-platform-study-dev-control-plane condition met\nnode/ml-platform-study-dev-worker condition met\nnode/ml-platform-study-dev-worker2 condition met\nkind cluster 'ml-platform-study-dev' is available\nmake[1]: Leaving directory '/home/konrad/Desktop/projects/ml_platform'"
+    },
+    {
+      "command": [
+        "make",
+        "apply-tls"
+      ],
+      "elapsed_seconds": 552.1,
+      "name": "apply_tls_foundation",
+      "returncode": 0,
+      "stderr_tail": "I0815 13:31:28.295067       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.295096       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.297743       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.297786       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.297745       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.297808       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.306148       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.306179       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.342837       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.342863       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.369238       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.369271       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.431952       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.432008       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.605749       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.605766       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.653218       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.653243       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.780661       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.780714       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.845156       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.845221       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.954318       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.954346       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:28.985470       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:28.985498       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:29.389227       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:29.389252       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:31:29.716182       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:31:29.716212       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nPulled: quay.io/jetstack/charts/cert-manager:v1.21.0\nDigest: sha256:cd55fea42658e54abc25e85a0bc1de229925a5006445f916bfd2c6dc80ac3613\nI0815 13:38:34.016831       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:38:34.016856       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:38:34.031281       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:38:34.031300       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:38:34.060687       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:38:34.060724       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:38:34.065181       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:38:34.065310       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"",
+      "stdout_tail": "or Issuer resource (for example, by creating a 'letsencrypt-staging' issuer).\n\nMore information on the different types of issuers and how to configure them\ncan be found in our documentation:\n\nhttps://cert-manager.io/docs/configuration/\n\nFor information on how to configure cert-manager to automatically provision\nCertificates for Ingress resources, take a look at the `ingress-shim`\ndocumentation:\n\nhttps://cert-manager.io/docs/usage/ingress/\n\nFor information on how to configure cert-manager to automatically provision\nCertificates for Gateway API resources, take a look at the `gateway resource`\ndocumentation:\n\nhttps://cert-manager.io/docs/usage/gateway/\nkubectl --context kind-ml-platform-study-dev apply -k clusters/dev/tls\nservice/gateway-echo configured\ndeployment.apps/gateway-echo configured\ncertificate.cert-manager.io/gateway-echo-tls created\ncertificate.cert-manager.io/ml-platform-local-ca created\nissuer.cert-manager.io/ml-platform-local-ca created\nissuer.cert-manager.io/ml-platform-selfsigned-bootstrap created\nenvoyproxy.gateway.envoyproxy.io/ml-platform-local-hostport configured\ngateway.gateway.networking.k8s.io/ml-platform-local configured\ngatewayclass.gateway.networking.k8s.io/ml-platform-envoy configured\nhttproute.gateway.networking.k8s.io/gateway-echo configured\nhttproute.gateway.networking.k8s.io/gateway-echo-http-redirect created\nkubectl --context kind-ml-platform-study-dev wait --timeout=3m --namespace ml-platform-system certificate/ml-platform-local-ca --for=condition=Ready\ncertificate.cert-manager.io/ml-platform-local-ca condition met\nkubectl --context kind-ml-platform-study-dev wait --timeout=3m --namespace ml-platform-system certificate/gateway-echo-tls --for=condition=Ready\ncertificate.cert-manager.io/gateway-echo-tls condition met\nkubectl --context kind-ml-platform-study-dev wait --timeout=3m --namespace ml-platform-system gateway/ml-platform-local --for=condition=Programmed\ngateway.gateway.networking.k8s.io/ml-platform-local condition met\nkubectl --context kind-ml-platform-study-dev get secret ml-platform-local-ca --namespace ml-platform-system --output=jsonpath='{.data.ca\\.crt}' | base64 --decode > \"/tmp/ml-platform-local-ca.crt\"\nLocal CA bundle written to /tmp/ml-platform-local-ca.crt\nHTTPS route: curl --cacert /tmp/ml-platform-local-ca.crt --resolve gateway.ml-platform.local:8443:127.0.0.1 https://gateway.ml-platform.local:8443/gateway-echo\nmake[1]: Leaving directory '/home/konrad/Desktop/projects/ml_platform'"
+    },
+    {
+      "command": [
+        "make",
+        "apply-network-policy"
+      ],
+      "elapsed_seconds": 2.259,
+      "name": "apply_network_policies",
+      "returncode": 0,
+      "stderr_tail": "",
+      "stdout_tail": "bash scripts/cluster/status-kind.sh\nkind cluster: ml-platform-study-dev\nkind v0.32.0 go1.26.3 linux/amd64\nKubernetes control plane is running at https://127.0.0.1:38611\nCoreDNS is running at https://127.0.0.1:38611/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy\n\nTo further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.\nnode/ml-platform-study-dev-control-plane condition met\nnode/ml-platform-study-dev-worker condition met\nnode/ml-platform-study-dev-worker2 condition met\nNAME                                  STATUS   ROLES           AGE     VERSION   NODE-POOL       WORKLOAD-CLASS\nml-platform-study-dev-control-plane   Ready    control-plane   9m44s   v1.34.0   control-plane   \nml-platform-study-dev-worker          Ready    <none>          9m28s   v1.34.0   general         platform\nml-platform-study-dev-worker2         Ready    <none>          9m28s   v1.34.0   general         ml\nall nodes are Ready\nkubectl --context kind-ml-platform-study-dev apply -k clusters/dev/quotas\nnamespace/ml-platform-data unchanged\nnamespace/ml-platform-observability unchanged\nnamespace/ml-platform-project-housing unchanged\nnamespace/ml-platform-system unchanged\nresourcequota/platform-data-quota unchanged\nresourcequota/platform-observability-quota unchanged\nresourcequota/project-housing-no-besteffort-pods unchanged\nresourcequota/project-housing-quota unchanged\nresourcequota/platform-system-quota unchanged\nlimitrange/platform-container-bounds configured\nlimitrange/platform-container-bounds configured\nlimitrange/project-container-bounds configured\nlimitrange/platform-container-bounds configured\nkubectl --context kind-ml-platform-study-dev apply --dry-run=server -f tests/manifests/fixtures/project-pod-with-resources.yaml\npod/quota-accepts-resourced-pod created (server dry run)\nError from server (Forbidden): error when creating \"tests/manifests/fixtures/project-pod-without-resources.yaml\": pods \"quota-rejects-unresourced-pod\" is forbidden: failed quota: project-housing-quota: must specify limits.cpu for: pause; limits.memory for: pause\nproject namespace rejects pods without explicit resources\nkubectl --context kind-ml-platform-study-dev apply -k clusters/base/network-policies\nnetworkpolicy.networking.k8s.io/project-allow-dns-egress created\nnetworkpolicy.networking.k8s.io/project-allow-gateway-ingress created\nnetworkpolicy.networking.k8s.io/project-allow-network-test created\nnetworkpolicy.networking.k8s.io/project-allow-network-test-egress created\nnetworkpolicy.networking.k8s.io/project-default-deny created\nmake[1]: Leaving directory '/home/konrad/Desktop/projects/ml_platform'"
+    },
+    {
+      "command": [
+        "make",
+        "test-network-policy"
+      ],
+      "elapsed_seconds": 54.931,
+      "name": "test_network_policies",
+      "returncode": 0,
+      "stderr_tail": "",
+      "stdout_tail": "make[1]: Entering directory '/home/konrad/Desktop/projects/ml_platform'\nRUN_NETWORK_POLICY_INTEGRATION=1 KIND_CLUSTER_NAME=ml-platform-study-dev python -m pytest tests/integration/network\n============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0\nrootdir: /home/konrad/Desktop/projects/ml_platform\nconfigfile: pyproject.toml\ncollected 2 items\n\ntests/integration/network/test_network_policy.py ..                      [100%]\n\n============================== 2 passed in 54.61s ==============================\nmake[1]: Leaving directory '/home/konrad/Desktop/projects/ml_platform'"
+    },
+    {
+      "command": [
+        "make",
+        "apply-postgres"
+      ],
+      "elapsed_seconds": 229.425,
+      "name": "apply_postgres",
+      "returncode": 0,
+      "stderr_tail": "I0815 13:41:41.636266       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:41:41.663024       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:41:41.663803       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:41:41.685371       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:41:41.852713       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:41:41.852755       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"\nI0815 13:41:41.869095       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:41:41.869125       1 warnings.go:110] \"Warning: unrecognized format \\\"int32\\\"\"",
+      "stdout_tail": "limitrange/platform-container-bounds configured\nlimitrange/platform-container-bounds configured\nlimitrange/project-container-bounds configured\nlimitrange/platform-container-bounds configured\nkubectl --context kind-ml-platform-study-dev apply --dry-run=server -f tests/manifests/fixtures/project-pod-with-resources.yaml\npod/quota-accepts-resourced-pod created (server dry run)\nError from server (Forbidden): error when creating \"tests/manifests/fixtures/project-pod-without-resources.yaml\": pods \"quota-rejects-unresourced-pod\" is forbidden: failed quota: project-housing-quota: must specify limits.cpu for: pause; limits.memory for: pause\nproject namespace rejects pods without explicit resources\nRelease \"cnpg\" does not exist. Installing it now.\nNAME: cnpg\nLAST DEPLOYED: Sat Aug 15 13:41:40 2026\nNAMESPACE: ml-platform-system\nSTATUS: deployed\nREVISION: 1\nTEST SUITE: None\nNOTES:\nCloudNativePG operator should be installed in namespace \"ml-platform-system\".\nYou can now create a PostgreSQL cluster with 3 nodes as follows:\n\ncat <<EOF | kubectl apply -f -\n# Example of PostgreSQL cluster\napiVersion: postgresql.cnpg.io/v1\nkind: Cluster\nmetadata:\n  name: cluster-example\n  \nspec:\n  instances: 3\n  storage:\n    size: 1Gi\nEOF\n\nkubectl get -A cluster\nsecret/study-postgres-app created\nkubectl --context kind-ml-platform-study-dev apply -k clusters/dev/databases\ncluster.postgresql.cnpg.io/study-postgres created\nkubectl --context kind-ml-platform-study-dev wait --timeout=5m --namespace ml-platform-data cluster/study-postgres --for=condition=Ready\ncluster.postgresql.cnpg.io/study-postgres condition met\nCloudNativePG cluster: study-postgres.rw.ml-platform-data.svc.cluster.local:5432/study_app\nmake[1]: Leaving directory '/home/konrad/Desktop/projects/ml_platform'"
+    },
+    {
+      "command": [
+        "make",
+        "test-cluster-postgres"
+      ],
+      "elapsed_seconds": 14.964,
+      "name": "test_postgres_persistence",
+      "returncode": 0,
+      "stderr_tail": "",
+      "stdout_tail": "make[1]: Entering directory '/home/konrad/Desktop/projects/ml_platform'\nRUN_CLOUDNATIVEPG_INTEGRATION=1 KIND_CLUSTER_NAME=ml-platform-study-dev CLUSTER_POSTGRES_NAME=study-postgres CLUSTER_POSTGRES_NAMESPACE=ml-platform-data CLUSTER_POSTGRES_DATABASE=study_app CLUSTER_POSTGRES_USER=study_app python -m pytest tests/integration/cloudnativepg\n============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0\nrootdir: /home/konrad/Desktop/projects/ml_platform\nconfigfile: pyproject.toml\ncollected 3 items\n\ntests/integration/cloudnativepg/test_cluster_postgres.py ...             [100%]\n\n============================== 3 passed in 14.63s ==============================\nmake[1]: Leaving directory '/home/konrad/Desktop/projects/ml_platform'"
+    },
+    {
+      "command": [
+        "make",
+        "apply-object-storage"
+      ],
+      "elapsed_seconds": 22.003,
+      "name": "apply_object_storage",
+      "returncode": 0,
+      "stderr_tail": "Warning: spec.SessionAffinity is ignored for headless services\n\u001b[2m2026-08-15T13:45:52.663653Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connected to 10.244.2.11:3901, negotiating handshake...    \n\u001b[2m2026-08-15T13:45:52.705263Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connection established to dd40e1f104710015    \n\u001b[2m2026-08-15T13:45:52.819570Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connected to 10.244.2.11:3901, negotiating handshake...    \n\u001b[2m2026-08-15T13:45:52.861253Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connection established to dd40e1f104710015    \n\u001b[2m2026-08-15T13:45:53.015091Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connected to 10.244.2.11:3901, negotiating handshake...    \n\u001b[2m2026-08-15T13:45:53.057312Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connection established to dd40e1f104710015    \n\u001b[2m2026-08-15T13:45:53.502959Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connected to 10.244.2.11:3901, negotiating handshake...    \n\u001b[2m2026-08-15T13:45:53.544212Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connection established to dd40e1f104710015    \n\u001b[2m2026-08-15T13:45:53.807362Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connected to 10.244.2.11:3901, negotiating handshake...    \n\u001b[2m2026-08-15T13:45:53.850159Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connection established to dd40e1f104710015    \n\u001b[2m2026-08-15T13:45:53.961403Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connected to 10.244.2.11:3901, negotiating handshake...    \n\u001b[2m2026-08-15T13:45:54.003124Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connection established to dd40e1f104710015    \n\u001b[2m2026-08-15T13:45:54.130463Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connected to 10.244.2.11:3901, negotiating handshake...    \n\u001b[2m2026-08-15T13:45:54.172255Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connection established to dd40e1f104710015    ",
+      "stdout_tail": "local               Tags  Partitions        Capacity   Usable capacity\n  dd40e1f104710015  []    256 (256 new)     1000.0 MB  1000.0 MB (100.0%)\n  TOTAL                   256 (256 unique)  1000.0 MB  1000.0 MB (100.0%)\n\n\nNew cluster layout with updated role assignment has been applied in cluster.\nData will now be moved around between nodes accordingly.\n==== ACCESS KEY INFORMATION ====\nKey ID:              GK111111111111111111111111\nKey name:            local-lab\nSecret key:          (redacted)\nCreated:             2026-08-15 13:45:53.544 +00:00\nValidity:            valid\nExpiration:          never\n\nCan create buckets:  false\n\n==== BUCKETS FOR THIS KEY ====\nPermissions  ID  Global aliases  Local aliases\n==== BUCKET INFORMATION ====\nBucket:          258e972db8d0aa188d0aea1d9a21a8d1616e5f18a9efb1f75da6633120f53f5e\nCreated:         2026-08-15 13:45:53.850 +00:00\n\nSize:            0 B (0 B)\nObjects:         0\n\nWebsite access:  false\n\nGlobal alias:    ml-platform-artifacts\n\n==== KEYS FOR THIS BUCKET ====\nPermissions  Access key    Local aliases\nkubectl --context kind-ml-platform-study-dev delete job garage-bootstrap --namespace ml-platform-data --ignore-not-found=true\njob.batch \"garage-bootstrap\" deleted from ml-platform-data namespace\nkubectl --context kind-ml-platform-study-dev apply -f clusters/dev/storage/bootstrap-job.yaml\njob.batch/garage-bootstrap created\nkubectl --context kind-ml-platform-study-dev wait --timeout=5m --namespace ml-platform-data job/garage-bootstrap --for=condition=Complete\njob.batch/garage-bootstrap condition met\nGarage S3 service: garage-s3.ml-platform-data.svc.cluster.local:3900\nmake[1]: Leaving directory '/home/konrad/Desktop/projects/ml_platform'"
+    },
+    {
+      "command": [
+        "make",
+        "test-cluster-object-storage"
+      ],
+      "elapsed_seconds": 10.673,
+      "name": "test_object_storage_persistence",
+      "returncode": 0,
+      "stderr_tail": "",
+      "stdout_tail": "make[1]: Entering directory '/home/konrad/Desktop/projects/ml_platform'\nRUN_CLUSTER_OBJECT_STORE_INTEGRATION=1 KIND_CLUSTER_NAME=ml-platform-study-dev CLUSTER_GARAGE_NAMESPACE=ml-platform-data CLUSTER_GARAGE_PORT=13900 GARAGE_BUCKET=ml-platform-artifacts GARAGE_KEY_ID=GK111111111111111111111111 GARAGE_SECRET_KEY=<redacted> GARAGE_S3_REGION=garage GARAGE_S3_ENDPOINT=http://127.0.0.1:13900 python -m pytest tests/integration/object_store\n============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0\nrootdir: /home/konrad/Desktop/projects/ml_platform\nconfigfile: pyproject.toml\ncollected 2 items\n\ntests/integration/object_store/test_cluster_garage.py ..                 [100%]\n\n============================== 2 passed in 10.35s ==============================\nmake[1]: Leaving directory '/home/konrad/Desktop/projects/ml_platform'"
+    },
+    {
+      "command": [
+        "make",
+        "restore-drill-phase-01"
+      ],
+      "elapsed_seconds": 359.054,
+      "name": "backup_and_restore_fixture",
+      "returncode": 0,
+      "stderr_tail": "\u001b[2m2026-08-15T13:46:18.657250Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connected to 10.244.2.13:3901, negotiating handshake...    \n\u001b[2m2026-08-15T13:46:18.700132Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connection established to dd40e1f104710015    \n\u001b[2m2026-08-15T13:46:19.153862Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connected to 10.244.2.13:3901, negotiating handshake...    \n\u001b[2m2026-08-15T13:46:19.195178Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connection established to dd40e1f104710015    \n\u001b[2m2026-08-15T13:46:19.316893Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connected to 10.244.2.13:3901, negotiating handshake...    \n\u001b[2m2026-08-15T13:46:19.360140Z\u001b[0m \u001b[32m INFO\u001b[0m \u001b[2mgarage_net::netapp\u001b[0m\u001b[2m:\u001b[0m Connection established to dd40e1f104710015    \nI0815 13:50:10.892753       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:50:10.917250       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:50:10.965123       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"\nI0815 13:50:10.992862       1 warnings.go:110] \"Warning: unrecognized format \\\"int64\\\"\"",
+      "stdout_tail": "secret/velero-credentials created\nRelease \"velero\" does not exist. Installing it now.\nNAME: velero\nLAST DEPLOYED: Sat Aug 15 13:50:11 2026\nNAMESPACE: velero\nSTATUS: deployed\nREVISION: 1\nTEST SUITE: None\nNOTES:\nCheck that the velero is up and running:\n\n    kubectl get deployment/velero -n velero\n\nCheck that the secret has been created:\n\n    kubectl get secret/velero -n velero\n\nOnce velero server is up and running you need the client before you can use it\n1. wget https://github.com/vmware-tanzu/velero/releases/download/v1.18.1/velero-v1.18.1-darwin-amd64.tar.gz\n2. tar -xvf velero-v1.18.1-darwin-amd64.tar.gz -C velero-client\n\nMore info on the official site: https://velero.io/docs\nkubectl --context kind-ml-platform-study-dev rollout status deployment/velero --namespace velero --timeout=5m\nWaiting for deployment \"velero\" rollout to finish: 0 of 1 updated replicas are available...\ndeployment \"velero\" successfully rolled out\nbash scripts/backup/phase-01-backup.sh\nbackup.velero.io/phase-01-20260815135148 created\nVelero backup completed: phase-01-20260815135148\npython -m tests.dr.phase_01.restore_drill\nPhase 1 restore drill report written to docs/reports/phase-01-restore-drill.json\n============================= test session starts ==============================\nplatform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0\nrootdir: /home/konrad/Desktop/projects/ml_platform\nconfigfile: pyproject.toml\ncollected 3 items\n\ntests/dr/phase_01/test_restore_drill_report.py ...                       [100%]\n\n============================== 3 passed in 0.02s ===============================\nmake[1]: Leaving directory '/home/konrad/Desktop/projects/ml_platform'"
+    },
+    {
+      "command": [
+        "bash",
+        "scripts/cluster/delete-kind.sh"
+      ],
+      "elapsed_seconds": 3.861,
+      "name": "delete_exact_cluster_after_drill",
+      "returncode": 0,
+      "stderr_tail": "Deleting cluster \"ml-platform-study-dev\" ...\nDeleted nodes: [\"ml-platform-study-dev-worker\" \"ml-platform-study-dev-control-plane\" \"ml-platform-study-dev-worker2\"]",
+      "stdout_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "scripts/cluster/delete-kind.sh"
+      ],
+      "elapsed_seconds": 0.04,
+      "name": "confirm_cluster_absent",
+      "returncode": 0,
+      "stderr_tail": "",
+      "stdout_tail": "kind cluster 'ml-platform-study-dev' does not exist"
+    }
+  ]
+}
