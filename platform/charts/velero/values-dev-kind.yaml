@@ -1,0 +1,66 @@
+image:
+  repository: docker.io/velero/velero
+  tag: v1.18.1
+  pullPolicy: IfNotPresent
+
+initContainers:
+  - name: velero-plugin-for-aws
+    image: docker.io/velero/velero-plugin-for-aws:v1.14.1
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+upgradeJobResources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+kubectl:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+
+credentials:
+  useSecret: true
+  existingSecret: velero-credentials
+
+configuration:
+  defaultBackupStorageLocation: default
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: ml-platform-artifacts
+      prefix: velero/phase-01
+      default: true
+      config:
+        region: garage
+        s3ForcePathStyle: "true"
+        s3Url: http://garage-s3.ml-platform-data.svc.cluster.local:3900
+  volumeSnapshotLocation: []
+
+snapshotsEnabled: false
+deployNodeAgent: false
+
+backupsEnabled: true
+schedules: {}
