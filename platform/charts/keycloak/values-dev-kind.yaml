@@ -1,0 +1,28 @@
+image:
+  repository: quay.io/keycloak/keycloak
+  tag: 26.6.4
+
+realm:
+  name: ml-platform-study
+  roles:
+    - admin
+    - learner
+    - viewer
+    - service
+
+database:
+  type: cloudnativepg
+  cluster: keycloak-postgres
+  namespace: ml-platform-data
+  database: keycloak
+
+runtime:
+  namespace: ml-platform-system
+  command:
+    - start-dev
+    - --import-realm
+
+notes:
+  - Study-only deployment.
+  - Bootstrap admin and database passwords are generated locally or supplied externally by Makefile targets.
+  - No plaintext credentials belong in this file.

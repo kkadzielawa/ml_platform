@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-study-realm
+  namespace: ml-platform-system
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: identity
+data:
+  ml-platform-study-realm.json: |
+    {
+      "realm": "ml-platform-study",
+      "enabled": true,
+      "displayName": "ML Platform Study",
+      "registrationAllowed": false,
+      "resetPasswordAllowed": false,
+      "rememberMe": false,
+      "roles": {
+        "realm": [
+          {
+            "name": "admin",
+            "description": "Platform administrator for the local study realm"
+          },
+          {
+            "name": "learner",
+            "description": "Human learner role for guided platform exercises"
+          },
+          {
+            "name": "viewer",
+            "description": "Read-only role for project and platform inspection"
+          },
+          {
+            "name": "service",
+            "description": "Service identity role for scoped automation clients"
+          }
+        ]
+      },
+      "groups": [
+        {
+          "name": "platform-admins",
+          "realmRoles": ["admin"]
+        },
+        {
+          "name": "platform-learners",
+          "realmRoles": ["learner"]
+        },
+        {
+          "name": "platform-viewers",
+          "realmRoles": ["viewer"]
+        },
+        {
+          "name": "platform-services",
+          "realmRoles": ["service"]
+        }
+      ]
+    }

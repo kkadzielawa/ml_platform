@@ -60,6 +60,15 @@ export VELERO_AWS_PLUGIN_VERSION ?= 1.14.1
 export VELERO_RELEASE ?= velero
 export VELERO_NAMESPACE ?= velero
 export VELERO_CHART_REPO ?= https://vmware-tanzu.github.io/helm-charts
+export KEYCLOAK_VERSION ?= 26.6.4
+export KEYCLOAK_IMAGE ?= quay.io/keycloak/keycloak:$(KEYCLOAK_VERSION)
+export KEYCLOAK_NAMESPACE ?= ml-platform-system
+export KEYCLOAK_DB_NAMESPACE ?= ml-platform-data
+export KEYCLOAK_DB_CLUSTER ?= keycloak-postgres
+export KEYCLOAK_DB_NAME ?= keycloak
+export KEYCLOAK_DB_USER ?= keycloak
+export KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME ?= admin
+export KEYCLOAK_PORT ?= 18081
 export CLUSTER_POSTGRES_NAME ?= study-postgres
 export CLUSTER_POSTGRES_NAMESPACE ?= ml-platform-data
 export CLUSTER_POSTGRES_DATABASE ?= study_app
@@ -68,7 +77,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak
 test:
 	python -m pytest
 
@@ -231,3 +240,16 @@ restore-drill-phase-01: backup-phase-01
 e2e-phase-01:
 	python -m scripts.phase_01.e2e
 	@RUN_PHASE_01_E2E=1 python -m pytest tests/e2e/phase_01
+
+apply-keycloak: cluster-create apply-tls apply-postgres
+	@if kubectl --context kind-$(KIND_CLUSTER_NAME) get secret keycloak-bootstrap-admin --namespace $(KEYCLOAK_NAMESPACE) >/dev/null 2>&1; then echo "secret/keycloak-bootstrap-admin unchanged"; else admin_password="$${KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD:-}"; if [ -z "$$admin_password" ]; then admin_password="$$(python -c 'import secrets; print(secrets.token_urlsafe(36))')"; fi; kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic keycloak-bootstrap-admin --namespace $(KEYCLOAK_NAMESPACE) --from-literal=username="$(KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME)" --from-literal=password="$$admin_password"; fi
+	@if kubectl --context kind-$(KIND_CLUSTER_NAME) get secret $(KEYCLOAK_DB_CLUSTER)-app --namespace $(KEYCLOAK_DB_NAMESPACE) >/dev/null 2>&1; then echo "secret/$(KEYCLOAK_DB_CLUSTER)-app unchanged"; else db_password="$${KEYCLOAK_DB_PASSWORD:-}"; if [ -z "$$db_password" ]; then db_password="$$(python -c 'import secrets; print(secrets.token_urlsafe(36))')"; fi; kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic $(KEYCLOAK_DB_CLUSTER)-app --namespace $(KEYCLOAK_DB_NAMESPACE) --type=kubernetes.io/basic-auth --from-literal=username="$(KEYCLOAK_DB_USER)" --from-literal=password="$$db_password"; fi
+	@if kubectl --context kind-$(KIND_CLUSTER_NAME) get secret keycloak-database --namespace $(KEYCLOAK_NAMESPACE) >/dev/null 2>&1; then echo "secret/keycloak-database unchanged"; else db_username="$$(kubectl --context kind-$(KIND_CLUSTER_NAME) get secret $(KEYCLOAK_DB_CLUSTER)-app --namespace $(KEYCLOAK_DB_NAMESPACE) -o jsonpath='{.data.username}' | base64 --decode)"; db_password="$$(kubectl --context kind-$(KIND_CLUSTER_NAME) get secret $(KEYCLOAK_DB_CLUSTER)-app --namespace $(KEYCLOAK_DB_NAMESPACE) -o jsonpath='{.data.password}' | base64 --decode)"; kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic keycloak-database --namespace $(KEYCLOAK_NAMESPACE) --from-literal=username="$$db_username" --from-literal=password="$$db_password"; fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/identity
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(KEYCLOAK_DB_NAMESPACE) cluster/$(KEYCLOAK_DB_CLUSTER) --for=condition=Ready
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(KEYCLOAK_NAMESPACE) deployment/keycloak --for=condition=Available
+	@echo "Keycloak service: keycloak.$(KEYCLOAK_NAMESPACE).svc.cluster.local:8080"
+	@echo "Local access: kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward -n $(KEYCLOAK_NAMESPACE) svc/keycloak $(KEYCLOAK_PORT):8080"
+
+test-keycloak:
+	@RUN_KEYCLOAK_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) KEYCLOAK_NAMESPACE=$(KEYCLOAK_NAMESPACE) KEYCLOAK_DB_NAMESPACE=$(KEYCLOAK_DB_NAMESPACE) KEYCLOAK_PORT=$(KEYCLOAK_PORT) python -m pytest tests/integration/keycloak
