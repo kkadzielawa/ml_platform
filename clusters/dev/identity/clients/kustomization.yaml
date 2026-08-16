@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - oidc-echo-registration.yaml
+  - oidc-echo-app.yaml
+
+configMapGenerator:
+  - name: oidc-echo-client-registration
+    namespace: ml-platform-system
+    files:
+      - register_oidc_echo.py
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: ml-platform-study
+      ml-platform.local/phase: "02"
+      ml-platform.local/component: identity
+      ml-platform.local/cluster-route: kind

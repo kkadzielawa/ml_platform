@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oidc-echo
+  namespace: ml-platform-system
+  labels:
+    app.kubernetes.io/name: oidc-echo
+    app.kubernetes.io/component: identity-fixture
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: oidc-echo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: oidc-echo
+        app.kubernetes.io/component: identity-fixture
+    spec:
+      serviceAccountName: oidc-echo
+      containers:
+        - name: oidc-echo
+          image: docker.io/library/python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - /app/app.py
+          env:
+            - name: PORT
+              value: "8080"
+            - name: OIDC_REALM
+              value: ml-platform-study
+            - name: OIDC_INTERNAL_ISSUER
+              value: http://keycloak.ml-platform-system.svc.cluster.local:8080/realms/ml-platform-study
+            - name: OIDC_BROWSER_ISSUER
+              value: http://127.0.0.1:18081/realms/ml-platform-study
+            - name: OIDC_REDIRECT_URI
+              value: http://127.0.0.1:18082/callback
+            - name: OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-echo-client
+                  key: client-id
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-echo-client
+                  key: client-secret
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 150m
+              memory: 192Mi
+          volumeMounts:
+            - name: app
+              mountPath: /app
+              readOnly: true
+      volumes:
+        - name: app
+          configMap:
+            name: oidc-echo-app
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oidc-echo
+  namespace: ml-platform-system
+  labels:
+    app.kubernetes.io/name: oidc-echo
+    app.kubernetes.io/component: identity-fixture
+spec:
+  selector:
+    app.kubernetes.io/name: oidc-echo
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: oidc-echo
+  namespace: ml-platform-system
+  labels:
+    app.kubernetes.io/name: oidc-echo
+    app.kubernetes.io/component: identity-fixture
+spec:
+  parentRefs:
+    - name: ml-platform-local
+  hostnames:
+    - gateway.ml-platform.local
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /oidc-echo
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: oidc-echo
+          port: 8080

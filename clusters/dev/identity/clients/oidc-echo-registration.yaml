@@ -1,0 +1,97 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: oidc-echo-client-registration
+  namespace: ml-platform-system
+  labels:
+    app.kubernetes.io/name: oidc-echo-client-registration
+    app.kubernetes.io/component: identity-client
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: oidc-echo-client-registration
+        app.kubernetes.io/component: identity-client
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: register-client
+          image: docker.io/library/python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - /registration/register_oidc_echo.py
+          env:
+            - name: KEYCLOAK_URL
+              value: http://keycloak.ml-platform-system.svc.cluster.local:8080
+            - name: KEYCLOAK_REALM
+              value: ml-platform-study
+            - name: KEYCLOAK_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-admin
+                  key: username
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-bootstrap-admin
+                  key: password
+            - name: OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-echo-client
+                  key: client-id
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-echo-client
+                  key: client-secret
+            - name: OIDC_REDIRECT_URI
+              value: http://127.0.0.1:18082/callback
+            - name: OIDC_BROWSER_ORIGIN
+              value: http://127.0.0.1:18082
+            - name: OIDC_VIEWER_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-echo-test-users
+                  key: viewer-username
+            - name: OIDC_VIEWER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-echo-test-users
+                  key: viewer-password
+            - name: OIDC_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-echo-test-users
+                  key: admin-username
+            - name: OIDC_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: oidc-echo-test-users
+                  key: admin-password
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 150m
+              memory: 192Mi
+          volumeMounts:
+            - name: registration
+              mountPath: /registration
+              readOnly: true
+      volumes:
+        - name: registration
+          configMap:
+            name: oidc-echo-client-registration
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oidc-echo
+  namespace: ml-platform-system
+  labels:
+    app.kubernetes.io/name: oidc-echo
+    app.kubernetes.io/component: identity-fixture

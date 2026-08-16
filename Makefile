@@ -69,6 +69,11 @@ export KEYCLOAK_DB_NAME ?= keycloak
 export KEYCLOAK_DB_USER ?= keycloak
 export KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME ?= admin
 export KEYCLOAK_PORT ?= 18081
+export OIDC_ECHO_CLIENT_ID ?= oidc-echo
+export OIDC_ECHO_NAMESPACE ?= ml-platform-system
+export OIDC_ECHO_PORT ?= 18082
+export OIDC_ECHO_VIEWER_USERNAME ?= oidc-viewer
+export OIDC_ECHO_ADMIN_USERNAME ?= oidc-admin
 export CLUSTER_POSTGRES_NAME ?= study-postgres
 export CLUSTER_POSTGRES_NAMESPACE ?= ml-platform-data
 export CLUSTER_POSTGRES_DATABASE ?= study_app
@@ -77,7 +82,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc
 test:
 	python -m pytest
 
@@ -253,3 +258,18 @@ apply-keycloak: cluster-create apply-tls apply-postgres
 
 test-keycloak:
 	@RUN_KEYCLOAK_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) KEYCLOAK_NAMESPACE=$(KEYCLOAK_NAMESPACE) KEYCLOAK_DB_NAMESPACE=$(KEYCLOAK_DB_NAMESPACE) KEYCLOAK_PORT=$(KEYCLOAK_PORT) python -m pytest tests/integration/keycloak
+
+apply-oidc-fixture: apply-keycloak
+	@if kubectl --context kind-$(KIND_CLUSTER_NAME) get secret oidc-echo-client --namespace $(OIDC_ECHO_NAMESPACE) >/dev/null 2>&1; then echo "secret/oidc-echo-client unchanged"; else client_secret="$${OIDC_ECHO_CLIENT_SECRET:-}"; if [ -z "$$client_secret" ]; then client_secret="$$(python -c 'import secrets; print(secrets.token_urlsafe(36))')"; fi; kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic oidc-echo-client --namespace $(OIDC_ECHO_NAMESPACE) --from-literal=client-id="$(OIDC_ECHO_CLIENT_ID)" --from-literal=client-secret="$$client_secret"; fi
+	@if kubectl --context kind-$(KIND_CLUSTER_NAME) get secret oidc-echo-test-users --namespace $(OIDC_ECHO_NAMESPACE) >/dev/null 2>&1; then echo "secret/oidc-echo-test-users unchanged"; else viewer_password="$${OIDC_ECHO_VIEWER_PASSWORD:-}"; admin_password="$${OIDC_ECHO_ADMIN_PASSWORD:-}"; if [ -z "$$viewer_password" ]; then viewer_password="$$(python -c 'import secrets; print(secrets.token_urlsafe(36))')"; fi; if [ -z "$$admin_password" ]; then admin_password="$$(python -c 'import secrets; print(secrets.token_urlsafe(36))')"; fi; kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic oidc-echo-test-users --namespace $(OIDC_ECHO_NAMESPACE) --from-literal=viewer-username="$(OIDC_ECHO_VIEWER_USERNAME)" --from-literal=viewer-password="$$viewer_password" --from-literal=admin-username="$(OIDC_ECHO_ADMIN_USERNAME)" --from-literal=admin-password="$$admin_password"; fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) create configmap oidc-echo-app --namespace $(OIDC_ECHO_NAMESPACE) --from-file=app.py=examples/oidc_echo/app.py --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	kubectl --context kind-$(KIND_CLUSTER_NAME) delete job oidc-echo-client-registration --namespace $(OIDC_ECHO_NAMESPACE) --ignore-not-found=true
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/identity/clients
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m --namespace $(OIDC_ECHO_NAMESPACE) job/oidc-echo-client-registration --for=condition=Complete
+	kubectl --context kind-$(KIND_CLUSTER_NAME) rollout restart --namespace $(OIDC_ECHO_NAMESPACE) deployment/oidc-echo
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m --namespace $(OIDC_ECHO_NAMESPACE) deployment/oidc-echo --for=condition=Available
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m --namespace $(OIDC_ECHO_NAMESPACE) httproute/oidc-echo --for=jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}'=True
+	@echo "OIDC echo fixture: kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward -n $(OIDC_ECHO_NAMESPACE) svc/oidc-echo $(OIDC_ECHO_PORT):8080"
+
+test-oidc:
+	@RUN_OIDC_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) KEYCLOAK_NAMESPACE=$(KEYCLOAK_NAMESPACE) KEYCLOAK_PORT=$(KEYCLOAK_PORT) OIDC_ECHO_NAMESPACE=$(OIDC_ECHO_NAMESPACE) OIDC_ECHO_PORT=$(OIDC_ECHO_PORT) python -m pytest tests/integration/oidc
