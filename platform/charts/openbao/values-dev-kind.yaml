@@ -1,0 +1,55 @@
+global:
+  tlsDisable: true
+
+injector:
+  enabled: false
+
+server:
+  image:
+    repository: openbao/openbao
+    tag: "2.6.0"
+    pullPolicy: IfNotPresent
+  updateStrategyType: RollingUpdate
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      cpu: 100m
+      memory: 512Mi
+  dataStorage:
+    enabled: true
+    size: 1Gi
+    mountPath: /openbao/data
+  auditStorage:
+    enabled: false
+  standalone:
+    enabled: true
+    config: |
+      ui = true
+
+      listener "tcp" {
+        tls_disable = 1
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+
+      storage "file" {
+        path = "/openbao/data"
+      }
+  readinessProbe:
+    enabled: true
+    path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+    port: 8200
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 24
+  livenessProbe:
+    enabled: false
+
+csi:
+  enabled: false
+
+serverTelemetry:
+  prometheusOperator: false

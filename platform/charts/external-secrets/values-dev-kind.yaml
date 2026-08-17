@@ -1,0 +1,42 @@
+installCRDs: true
+
+replicaCount: 1
+
+strategy:
+  type: Recreate
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 96Mi
+  limits:
+    cpu: 50m
+    memory: 192Mi
+
+webhook:
+  strategy:
+    type: Recreate
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 50m
+      memory: 128Mi
+
+certController:
+  strategy:
+    type: Recreate
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 50m
+      memory: 128Mi
+
+serviceMonitor:
+  enabled: false
+
+grafanaDashboard:
+  enabled: false

@@ -60,6 +60,17 @@ export VELERO_AWS_PLUGIN_VERSION ?= 1.14.1
 export VELERO_RELEASE ?= velero
 export VELERO_NAMESPACE ?= velero
 export VELERO_CHART_REPO ?= https://vmware-tanzu.github.io/helm-charts
+export OPENBAO_CHART_VERSION ?= 0.28.5
+export OPENBAO_APP_VERSION ?= 2.6.0
+export OPENBAO_RELEASE ?= openbao
+export OPENBAO_NAMESPACE ?= ml-platform-system
+export OPENBAO_CHART_REPO ?= https://openbao.github.io/openbao-helm
+export EXTERNAL_SECRETS_CHART_VERSION ?= 2.8.0
+export EXTERNAL_SECRETS_APP_VERSION ?= v2.8.0
+export EXTERNAL_SECRETS_RELEASE ?= external-secrets
+export EXTERNAL_SECRETS_NAMESPACE ?= ml-platform-system
+export EXTERNAL_SECRETS_CHART_REPO ?= https://charts.external-secrets.io
+export SECRETS_EXAMPLE_NAMESPACE ?= ml-platform-project-housing
 export KEYCLOAK_VERSION ?= 26.6.4
 export KEYCLOAK_IMAGE ?= quay.io/keycloak/keycloak:$(KEYCLOAK_VERSION)
 export KEYCLOAK_NAMESPACE ?= ml-platform-system
@@ -82,7 +93,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets
 test:
 	python -m pytest
 
@@ -279,3 +290,20 @@ apply-rbac: apply-namespaces
 
 test-rbac:
 	@RUN_RBAC_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) python -m pytest tests/integration/rbac
+
+apply-secrets: apply-postgres
+	@if command -v helm >/dev/null; then helm upgrade --install $(OPENBAO_RELEASE) openbao --repo $(OPENBAO_CHART_REPO) --version $(OPENBAO_CHART_VERSION) --namespace $(OPENBAO_NAMESPACE) --create-namespace --values platform/charts/openbao/values-dev-kind.yaml; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(OPENBAO_RELEASE) openbao --repo $(OPENBAO_CHART_REPO) --version $(OPENBAO_CHART_VERSION) --namespace $(OPENBAO_NAMESPACE) --create-namespace --values platform/charts/openbao/values-dev-kind.yaml; fi
+	@if command -v helm >/dev/null; then helm upgrade --install $(EXTERNAL_SECRETS_RELEASE) external-secrets --repo $(EXTERNAL_SECRETS_CHART_REPO) --version $(EXTERNAL_SECRETS_CHART_VERSION) --namespace $(EXTERNAL_SECRETS_NAMESPACE) --create-namespace --values platform/charts/external-secrets/values-dev-kind.yaml --wait --timeout 5m; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(EXTERNAL_SECRETS_RELEASE) external-secrets --repo $(EXTERNAL_SECRETS_CHART_REPO) --version $(EXTERNAL_SECRETS_CHART_VERSION) --namespace $(EXTERNAL_SECRETS_NAMESPACE) --create-namespace --values platform/charts/external-secrets/values-dev-kind.yaml --wait --timeout 5m; fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(OPENBAO_NAMESPACE) pod/$(OPENBAO_RELEASE)-0 --for=jsonpath='{.status.phase}'=Running
+	@set -e; status="$$(kubectl --context kind-$(KIND_CLUSTER_NAME) exec --namespace $(OPENBAO_NAMESPACE) $(OPENBAO_RELEASE)-0 -- bao status -format=json 2>/dev/null || true)"; if printf '%s' "$$status" | python -c 'import json,sys; data=json.load(sys.stdin); raise SystemExit(0 if data.get("initialized") else 1)' >/dev/null 2>&1; then echo "openbao already initialized"; else init_file="$$(mktemp)"; kubectl --context kind-$(KIND_CLUSTER_NAME) exec --namespace $(OPENBAO_NAMESPACE) $(OPENBAO_RELEASE)-0 -- bao operator init -key-shares=1 -key-threshold=1 -format=json > "$$init_file"; root_token="$$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["root_token"])' "$$init_file")"; unseal_key="$$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["unseal_keys_b64"][0])' "$$init_file")"; kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic openbao-bootstrap --namespace $(OPENBAO_NAMESPACE) --from-literal=root-token="$$root_token" --from-literal=unseal-key="$$unseal_key" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -; rm -f "$$init_file"; echo "openbao initialized and bootstrap material stored in Kubernetes Secret for study use"; fi
+	@unseal_key="$$(kubectl --context kind-$(KIND_CLUSTER_NAME) get secret openbao-bootstrap --namespace $(OPENBAO_NAMESPACE) -o jsonpath='{.data.unseal-key}' | base64 --decode)"; kubectl --context kind-$(KIND_CLUSTER_NAME) exec --namespace $(OPENBAO_NAMESPACE) $(OPENBAO_RELEASE)-0 -- bao operator unseal "$$unseal_key" >/dev/null || true
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(OPENBAO_NAMESPACE) pod/$(OPENBAO_RELEASE)-0 --for=condition=Ready
+	@root_token="$$(kubectl --context kind-$(KIND_CLUSTER_NAME) get secret openbao-bootstrap --namespace $(OPENBAO_NAMESPACE) -o jsonpath='{.data.root-token}' | base64 --decode)"; generated_password="$$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"; kubectl --context kind-$(KIND_CLUSTER_NAME) exec --namespace $(OPENBAO_NAMESPACE) $(OPENBAO_RELEASE)-0 -- sh -ec 'export BAO_TOKEN="$$1"; generated_password="$$2"; bao secrets enable -path=kv kv-v2 >/dev/null 2>&1 || true; if ! bao kv get kv/projects/housing/database/study-reader >/dev/null 2>&1; then bao kv put kv/projects/housing/database/study-reader username=housing_reader password="$$generated_password" database=study_app >/dev/null; fi; printf "%s\n" "path \"kv/data/projects/housing/database/study-reader\" {" "  capabilities = [\"read\"]" "}" "path \"kv/metadata/projects/housing/database/study-reader\" {" "  capabilities = [\"read\"]" "}" > /tmp/external-secrets-housing-reader.hcl; bao policy write external-secrets-housing-reader /tmp/external-secrets-housing-reader.hcl >/dev/null; bao token create -policy=external-secrets-housing-reader -period=24h -format=json' sh "$$root_token" "$$generated_password" > /tmp/ml-platform-openbao-reader-token.json
+	@reader_token="$$(python -c 'import json; print(json.load(open("/tmp/ml-platform-openbao-reader-token.json"))["auth"]["client_token"])')"; kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic openbao-housing-reader-token --namespace $(SECRETS_EXAMPLE_NAMESPACE) --from-literal=token="$$reader_token" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -; rm -f /tmp/ml-platform-openbao-reader-token.json
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/secrets
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m --namespace $(SECRETS_EXAMPLE_NAMESPACE) secretstore/openbao-housing --for=condition=Ready
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m --namespace $(SECRETS_EXAMPLE_NAMESPACE) externalsecret/housing-database-credential --for=condition=Ready
+	@echo "Synced example Secret: housing-database-credential in $(SECRETS_EXAMPLE_NAMESPACE)"
+
+test-secrets:
+	@RUN_SECRETS_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) OPENBAO_NAMESPACE=$(OPENBAO_NAMESPACE) SECRETS_EXAMPLE_NAMESPACE=$(SECRETS_EXAMPLE_NAMESPACE) python -m pytest tests/integration/secrets
