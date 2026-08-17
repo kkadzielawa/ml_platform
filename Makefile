@@ -93,7 +93,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation
 test:
 	python -m pytest
 
@@ -307,3 +307,6 @@ apply-secrets: apply-postgres
 
 test-secrets:
 	@RUN_SECRETS_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) OPENBAO_NAMESPACE=$(OPENBAO_NAMESPACE) SECRETS_EXAMPLE_NAMESPACE=$(SECRETS_EXAMPLE_NAMESPACE) python -m pytest tests/integration/secrets
+
+test-secret-rotation:
+	@RUN_SECRET_ROTATION_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) OPENBAO_NAMESPACE=$(OPENBAO_NAMESPACE) KEYCLOAK_NAMESPACE=$(KEYCLOAK_NAMESPACE) KEYCLOAK_PORT=$(KEYCLOAK_PORT) OIDC_ECHO_NAMESPACE=$(OIDC_ECHO_NAMESPACE) OIDC_ECHO_PORT=$(OIDC_ECHO_PORT) python -m pytest tests/integration/secrets/rotation
