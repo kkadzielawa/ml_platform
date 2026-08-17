@@ -1,0 +1,80 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: project-viewer
+  namespace: ml-platform-project-housing
+  labels:
+    app.kubernetes.io/name: project-viewer
+    app.kubernetes.io/component: rbac
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "configmaps", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: platform-viewers-project-viewer
+  namespace: ml-platform-project-housing
+  labels:
+    app.kubernetes.io/name: project-viewer
+    app.kubernetes.io/component: rbac
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: platform-viewers
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: project-viewer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: project-editor
+  namespace: ml-platform-project-housing
+  labels:
+    app.kubernetes.io/name: project-editor
+    app.kubernetes.io/component: rbac
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "configmaps", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["services", "configmaps"]
+    verbs: ["create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: platform-learners-project-editor
+  namespace: ml-platform-project-housing
+  labels:
+    app.kubernetes.io/name: project-editor
+    app.kubernetes.io/component: rbac
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: platform-learners
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: project-editor
