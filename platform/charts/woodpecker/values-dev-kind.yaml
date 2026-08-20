@@ -1,0 +1,61 @@
+server:
+  enabled: true
+  statefulSet:
+    replicaCount: 1
+  updateStrategy:
+    type: RollingUpdate
+  image:
+    registry: docker.io
+    repository: woodpeckerci/woodpecker-server
+    tag: v3.15.0
+    pullPolicy: IfNotPresent
+  env:
+    WOODPECKER_HOST: http://woodpecker.ml-platform.local
+    WOODPECKER_OPEN: "false"
+    WOODPECKER_ADMIN: forgejo_admin
+    WOODPECKER_FORGEJO: "true"
+    WOODPECKER_FORGEJO_URL: http://forgejo-http.ml-platform-ci.svc.cluster.local:3000
+    WOODPECKER_BACKEND: kubernetes
+  extraSecretNamesForEnvFrom:
+    - woodpecker-secrets
+  createAgentSecret: true
+  persistentVolume:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 150m
+      memory: 256Mi
+
+agent:
+  enabled: true
+  replicaCount: 1
+  image:
+    registry: docker.io
+    repository: woodpeckerci/woodpecker-agent
+    tag: v3.15.0
+    pullPolicy: IfNotPresent
+  env:
+    WOODPECKER_SERVER: woodpecker-server:9000
+    WOODPECKER_BACKEND: kubernetes
+    WOODPECKER_BACKEND_K8S_NAMESPACE: ml-platform-ci
+    WOODPECKER_BACKEND_K8S_NAMESPACE_PER_ORGANIZATION: "false"
+    WOODPECKER_BACKEND_K8S_STORAGE_RWX: "false"
+    WOODPECKER_BACKEND_K8S_VOLUME_SIZE: 1G
+    WOODPECKER_CONNECT_RETRY_COUNT: "3"
+    WOODPECKER_MAX_WORKFLOWS: "1"
+  extraSecretNamesForEnvFrom:
+    - woodpecker-secrets
+  persistence:
+    enabled: true
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 150m
+      memory: 192Mi

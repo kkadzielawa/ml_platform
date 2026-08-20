@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-sample-pipeline
+  namespace: ml-platform-ci
+  labels:
+    app.kubernetes.io/name: ci-sample-pipeline
+    app.kubernetes.io/component: ci-fixture
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ci-sample-pipeline-recorder
+  namespace: ml-platform-ci
+  labels:
+    app.kubernetes.io/name: ci-sample-pipeline
+    app.kubernetes.io/component: ci-fixture
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "create", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-sample-pipeline-recorder
+  namespace: ml-platform-ci
+  labels:
+    app.kubernetes.io/name: ci-sample-pipeline
+    app.kubernetes.io/component: ci-fixture
+subjects:
+  - kind: ServiceAccount
+    name: ci-sample-pipeline
+    namespace: ml-platform-ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ci-sample-pipeline-recorder

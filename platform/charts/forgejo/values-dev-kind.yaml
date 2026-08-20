@@ -1,0 +1,56 @@
+image:
+  registry: code.forgejo.org
+  repository: forgejo/forgejo
+  tag: 15.0.6-rootless
+  pullPolicy: IfNotPresent
+  rootless: true
+
+strategy:
+  type: Recreate
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 192Mi
+  limits:
+    cpu: 150m
+    memory: 384Mi
+
+persistence:
+  enabled: true
+  create: true
+  size: 1Gi
+
+service:
+  http:
+    type: ClusterIP
+    port: 3000
+  ssh:
+    type: ClusterIP
+    port: 22
+
+gitea:
+  admin:
+    existingSecret: forgejo-admin
+    username: forgejo_admin
+    email: forgejo-admin@ml-platform.local
+    passwordMode: keepUpdated
+  config:
+    APP_NAME: "ML Platform Study Forgejo"
+    server:
+      DOMAIN: forgejo.ml-platform.local
+      ROOT_URL: http://forgejo.ml-platform.local/
+      HTTP_PORT: 3000
+      DISABLE_SSH: true
+    service:
+      DISABLE_REGISTRATION: true
+      REQUIRE_SIGNIN_VIEW: false
+    webhook:
+      ALLOWED_HOST_LIST: "external,loopback,private"
+    actions:
+      ENABLED: false
+    metrics:
+      ENABLED: true
+
+test:
+  enabled: false

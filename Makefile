@@ -71,6 +71,22 @@ export EXTERNAL_SECRETS_RELEASE ?= external-secrets
 export EXTERNAL_SECRETS_NAMESPACE ?= ml-platform-system
 export EXTERNAL_SECRETS_CHART_REPO ?= https://charts.external-secrets.io
 export SECRETS_EXAMPLE_NAMESPACE ?= ml-platform-project-housing
+export FORGEJO_CHART_VERSION ?= 17.1.0
+export FORGEJO_APP_VERSION ?= 15.0.6
+export FORGEJO_RELEASE ?= forgejo
+export FORGEJO_NAMESPACE ?= ml-platform-ci
+export FORGEJO_CHART ?= oci://code.forgejo.org/forgejo-helm/forgejo
+export FORGEJO_ADMIN_USERNAME ?= forgejo_admin
+export FORGEJO_ADMIN_PASSWORD ?= local-dev-forgejo-password
+export WOODPECKER_CHART_VERSION ?= 3.6.4
+export WOODPECKER_APP_VERSION ?= 3.15.0
+export WOODPECKER_RELEASE ?= woodpecker
+export WOODPECKER_NAMESPACE ?= ml-platform-ci
+export WOODPECKER_CHART ?= oci://ghcr.io/woodpecker-ci/helm/woodpecker
+export WOODPECKER_AGENT_SECRET ?= local-dev-woodpecker-agent-secret
+export WOODPECKER_FORGEJO_CLIENT ?= local-dev-forgejo-client
+export WOODPECKER_FORGEJO_SECRET ?= local-dev-forgejo-secret
+export WOODPECKER_SECRET ?= local-dev-woodpecker-server-secret
 export KEYCLOAK_VERSION ?= 26.6.4
 export KEYCLOAK_IMAGE ?= quay.io/keycloak/keycloak:$(KEYCLOAK_VERSION)
 export KEYCLOAK_NAMESPACE ?= ml-platform-system
@@ -93,7 +109,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci
 test:
 	python -m pytest
 
@@ -310,3 +326,18 @@ test-secrets:
 
 test-secret-rotation:
 	@RUN_SECRET_ROTATION_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) OPENBAO_NAMESPACE=$(OPENBAO_NAMESPACE) KEYCLOAK_NAMESPACE=$(KEYCLOAK_NAMESPACE) KEYCLOAK_PORT=$(KEYCLOAK_PORT) OIDC_ECHO_NAMESPACE=$(OIDC_ECHO_NAMESPACE) OIDC_ECHO_PORT=$(OIDC_ECHO_PORT) python -m pytest tests/integration/secrets/rotation
+
+apply-ci: apply-registry
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/ci
+	@kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic forgejo-admin --namespace $(FORGEJO_NAMESPACE) --from-literal=username="$(FORGEJO_ADMIN_USERNAME)" --from-literal=password="$(FORGEJO_ADMIN_PASSWORD)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	@kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic woodpecker-secrets --namespace $(WOODPECKER_NAMESPACE) --from-literal=WOODPECKER_AGENT_SECRET="$(WOODPECKER_AGENT_SECRET)" --from-literal=WOODPECKER_FORGEJO_CLIENT="$(WOODPECKER_FORGEJO_CLIENT)" --from-literal=WOODPECKER_FORGEJO_SECRET="$(WOODPECKER_FORGEJO_SECRET)" --from-literal=WOODPECKER_SECRET="$(WOODPECKER_SECRET)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	@if command -v helm >/dev/null; then helm upgrade --install $(FORGEJO_RELEASE) $(FORGEJO_CHART) --version $(FORGEJO_CHART_VERSION) --namespace $(FORGEJO_NAMESPACE) --create-namespace --values platform/charts/forgejo/values-dev-kind.yaml; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(FORGEJO_RELEASE) $(FORGEJO_CHART) --version $(FORGEJO_CHART_VERSION) --namespace $(FORGEJO_NAMESPACE) --create-namespace --values platform/charts/forgejo/values-dev-kind.yaml; fi
+	@if command -v helm >/dev/null; then helm upgrade --install $(WOODPECKER_RELEASE) $(WOODPECKER_CHART) --version $(WOODPECKER_CHART_VERSION) --namespace $(WOODPECKER_NAMESPACE) --create-namespace --values platform/charts/woodpecker/values-dev-kind.yaml; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(WOODPECKER_RELEASE) $(WOODPECKER_CHART) --version $(WOODPECKER_CHART_VERSION) --namespace $(WOODPECKER_NAMESPACE) --create-namespace --values platform/charts/woodpecker/values-dev-kind.yaml; fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(FORGEJO_NAMESPACE) deployment/forgejo --for=condition=Available
+	kubectl --context kind-$(KIND_CLUSTER_NAME) rollout status --timeout=5m --namespace $(WOODPECKER_NAMESPACE) statefulset/woodpecker-server
+	kubectl --context kind-$(KIND_CLUSTER_NAME) rollout status --timeout=5m --namespace $(WOODPECKER_NAMESPACE) statefulset/woodpecker-agent
+	@echo "Forgejo: kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward -n $(FORGEJO_NAMESPACE) svc/forgejo-http 13000:3000"
+	@echo "Woodpecker: kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward -n $(WOODPECKER_NAMESPACE) svc/woodpecker-server 18000:80"
+
+test-ci:
+	@RUN_CI_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) CI_NAMESPACE=$(WOODPECKER_NAMESPACE) HARBOR_NAMESPACE=$(HARBOR_NAMESPACE) HARBOR_ADMIN_USER=$(HARBOR_ADMIN_USER) HARBOR_ADMIN_PASSWORD=$(HARBOR_ADMIN_PASSWORD) CLUSTER_REGISTRY_HOST=$(CLUSTER_REGISTRY_HOST) CLUSTER_REGISTRY_PORT=$(CLUSTER_REGISTRY_PORT) python -m pytest tests/integration/ci

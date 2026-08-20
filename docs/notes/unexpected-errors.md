@@ -262,3 +262,34 @@ kubectl --context kind-ml-platform-study-dev get nodes -o wide
 kubectl --context kind-ml-platform-study-dev get pods -A -o wide
 ```
 
+## Platform namespace quota blocked Harbor reinstall
+
+### Symptom
+
+During `02.07.a`, `make apply-ci` tried to apply the registry dependency and Harbor could not create pods:
+
+```text
+exceeded quota: platform-system-quota
+requested: limits.cpu=175m,limits.memory=384Mi
+used: limits.cpu=2950m,limits.memory=4Gi
+limited: limits.cpu=3,limits.memory=4Gi
+```
+
+The namespace also hit its Secret quota because Helm stores release history as Kubernetes Secrets:
+
+```text
+secrets: used 50, hard 50
+```
+
+### Cause
+
+The original Phase 1 platform-system quota fit the early cluster services, but Phase 2 added identity, secrets, and CI dependencies. The platform namespace had become legitimately larger than the old quota allowed. Repeated Helm upgrades also accumulated release-history Secrets.
+
+### Resolution
+
+For the local study cluster:
+
+1. prune old Helm release-history Secrets while keeping recent revisions;
+2. raise the `ml-platform-system` dev quota from `3 CPU / 4Gi / 50 secrets` to `5 CPU / 6Gi / 80 secrets`.
+
+This keeps quota pressure visible while allowing the platform service stack to run on the laptop.
