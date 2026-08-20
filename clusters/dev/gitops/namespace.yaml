@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-platform-gitops
+  labels:
+    app.kubernetes.io/name: ml-platform-gitops
+    ml-platform.io/namespace-class: platform-gitops

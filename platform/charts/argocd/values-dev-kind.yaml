@@ -1,0 +1,99 @@
+global:
+  domain: argocd.ml-platform.local
+  nodeSelector:
+    ml-platform.local/workload-class: platform
+  image:
+    repository: quay.io/argoproj/argocd
+    tag: v3.4.3
+    imagePullPolicy: IfNotPresent
+
+configs:
+  cm:
+    url: http://127.0.0.1:18083
+    timeout.reconciliation: 15s
+    timeout.reconciliation.jitter: 0s
+    accounts.viewer: login
+    accounts.platform-admin: login
+    oidc.config: |
+      name: Keycloak
+      issuer: http://keycloak.ml-platform-system.svc.cluster.local:8080/realms/ml-platform-study
+      clientID: argocd
+      clientSecret: $argocd-oidc-client:clientSecret
+      requestedScopes:
+        - openid
+        - profile
+        - email
+        - groups
+  params:
+    server.insecure: true
+  rbac:
+    policy.default: role:readonly
+    scopes: "[groups, email]"
+    policy.csv: |
+      p, role:platform-admin, applications, get, */*, allow
+      p, role:platform-admin, applications, sync, */*, allow
+      p, role:platform-admin, applications, update, */*, allow
+      p, role:platform-admin, applications, action/*, */*, allow
+      p, role:platform-admin, repositories, get, *, allow
+      p, role:platform-admin, clusters, get, *, allow
+      g, platform-admin, role:platform-admin
+      g, platform-admins, role:platform-admin
+      g, viewer, role:readonly
+      g, platform-viewers, role:readonly
+
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+server:
+  replicas: 1
+  service:
+    type: ClusterIP
+    servicePortHttp: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 384Mi
+
+repoServer:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 384Mi
+
+redis:
+  enabled: true
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+dex:
+  enabled: false
+
+applicationSet:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+notifications:
+  enabled: false

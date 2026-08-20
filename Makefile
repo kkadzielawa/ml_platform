@@ -87,6 +87,13 @@ export WOODPECKER_AGENT_SECRET ?= local-dev-woodpecker-agent-secret
 export WOODPECKER_FORGEJO_CLIENT ?= local-dev-forgejo-client
 export WOODPECKER_FORGEJO_SECRET ?= local-dev-forgejo-secret
 export WOODPECKER_SECRET ?= local-dev-woodpecker-server-secret
+export ARGOCD_CHART_VERSION ?= 9.5.21
+export ARGOCD_APP_VERSION ?= v3.4.3
+export ARGOCD_RELEASE ?= argocd
+export ARGOCD_NAMESPACE ?= ml-platform-gitops
+export ARGOCD_CHART_REPO ?= https://argoproj.github.io/argo-helm
+export ARGOCD_OIDC_CLIENT_SECRET ?= local-dev-argocd-oidc-secret
+export ARGOCD_PORT ?= 18083
 export KEYCLOAK_VERSION ?= 26.6.4
 export KEYCLOAK_IMAGE ?= quay.io/keycloak/keycloak:$(KEYCLOAK_VERSION)
 export KEYCLOAK_NAMESPACE ?= ml-platform-system
@@ -109,7 +116,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops
 test:
 	python -m pytest
 
@@ -341,3 +348,19 @@ apply-ci: apply-registry
 
 test-ci:
 	@RUN_CI_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) CI_NAMESPACE=$(WOODPECKER_NAMESPACE) HARBOR_NAMESPACE=$(HARBOR_NAMESPACE) HARBOR_ADMIN_USER=$(HARBOR_ADMIN_USER) HARBOR_ADMIN_PASSWORD=$(HARBOR_ADMIN_PASSWORD) CLUSTER_REGISTRY_HOST=$(CLUSTER_REGISTRY_HOST) CLUSTER_REGISTRY_PORT=$(CLUSTER_REGISTRY_PORT) python -m pytest tests/integration/ci
+
+apply-gitops: apply-keycloak
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f clusters/dev/gitops/namespace.yaml
+	@kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic argocd-oidc-client --namespace $(ARGOCD_NAMESPACE) --from-literal=clientSecret="$(ARGOCD_OIDC_CLIENT_SECRET)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) KEYCLOAK_NAMESPACE=$(KEYCLOAK_NAMESPACE) KEYCLOAK_PORT=$(KEYCLOAK_PORT) ARGOCD_NAMESPACE=$(ARGOCD_NAMESPACE) ARGOCD_PORT=$(ARGOCD_PORT) python clusters/dev/gitops/register_argocd_oidc.py
+	@if command -v helm >/dev/null; then helm upgrade --install $(ARGOCD_RELEASE) argo-cd --repo $(ARGOCD_CHART_REPO) --version $(ARGOCD_CHART_VERSION) --namespace $(ARGOCD_NAMESPACE) --create-namespace --values platform/charts/argocd/values-dev-kind.yaml; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(ARGOCD_RELEASE) argo-cd --repo $(ARGOCD_CHART_REPO) --version $(ARGOCD_CHART_VERSION) --namespace $(ARGOCD_NAMESPACE) --create-namespace --values platform/charts/argocd/values-dev-kind.yaml; fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) rollout status --timeout=5m --namespace $(ARGOCD_NAMESPACE) statefulset/argocd-application-controller
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(ARGOCD_NAMESPACE) deployment/argocd-server --for=condition=Available
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(ARGOCD_NAMESPACE) deployment/argocd-repo-server --for=condition=Available
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(ARGOCD_NAMESPACE) deployment/argocd-redis --for=condition=Available
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f clusters/dev/gitops/root-application.yaml
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(ARGOCD_NAMESPACE) application/ci-fixture --for=jsonpath='{.status.sync.status}'=Synced
+	@echo "Argo CD: kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward -n $(ARGOCD_NAMESPACE) svc/argocd-server $(ARGOCD_PORT):80"
+
+test-gitops:
+	@RUN_GITOPS_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) ARGOCD_NAMESPACE=$(ARGOCD_NAMESPACE) ARGOCD_PORT=$(ARGOCD_PORT) python -m pytest tests/integration/gitops

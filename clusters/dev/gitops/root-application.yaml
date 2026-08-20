@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ci-fixture
+  namespace: ml-platform-gitops
+  labels:
+    app.kubernetes.io/name: ci-fixture
+    app.kubernetes.io/component: gitops-fixture
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kkadzielawa/ml_platform.git
+    targetRevision: main
+    path: clusters/dev/ci
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ml-platform-ci
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
