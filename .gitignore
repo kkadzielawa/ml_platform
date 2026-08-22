@@ -16,10 +16,11 @@ htmlcov/
 .tox/
 .nox/
 
-# Build artifacts
-build/
-dist/
+# Python packaging artifacts
 *.egg-info/
+*.whl
+*.tar.gz
+dist/
 
 # Local environment files
 .env

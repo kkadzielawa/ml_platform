@@ -94,6 +94,8 @@ export ARGOCD_NAMESPACE ?= ml-platform-gitops
 export ARGOCD_CHART_REPO ?= https://argoproj.github.io/argo-helm
 export ARGOCD_OIDC_CLIENT_SECRET ?= local-dev-argocd-oidc-secret
 export ARGOCD_PORT ?= 18083
+export BUILD_FIXTURE_IMAGE ?= ml-platform-study/build-fixture:local
+export BUILD_FIXTURE_SECRET_VALUE ?= fixture-build-secret-value
 export KEYCLOAK_VERSION ?= 26.6.4
 export KEYCLOAK_IMAGE ?= quay.io/keycloak/keycloak:$(KEYCLOAK_VERSION)
 export KEYCLOAK_NAMESPACE ?= ml-platform-system
@@ -116,7 +118,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops build-fixture test-image
 test:
 	python -m pytest
 
@@ -134,6 +136,12 @@ test-manifests:
 
 test-environments:
 	python -m pytest tests/manifests/test_environments.py
+
+build-fixture:
+	@set -eu; secret_file="$$(mktemp)"; trap 'rm -f "$$secret_file"' EXIT; printf '%s' "$(BUILD_FIXTURE_SECRET_VALUE)" > "$$secret_file"; DOCKER_BUILDKIT=1 docker buildx build --load --provenance=false --secret id=fixture_build_secret,src="$$secret_file" --file build/Dockerfile.build-fixture --tag "$(BUILD_FIXTURE_IMAGE)-first" .; first_image_id="$$(docker image inspect "$(BUILD_FIXTURE_IMAGE)-first" --format '{{.Id}}')"; DOCKER_BUILDKIT=1 docker buildx build --load --provenance=false --secret id=fixture_build_secret,src="$$secret_file" --file build/Dockerfile.build-fixture --tag "$(BUILD_FIXTURE_IMAGE)-second" .; second_image_id="$$(docker image inspect "$(BUILD_FIXTURE_IMAGE)-second" --format '{{.Id}}')"; docker tag "$(BUILD_FIXTURE_IMAGE)-second" "$(BUILD_FIXTURE_IMAGE)"; mkdir -p build/reports; if [ "$$first_image_id" = "$$second_image_id" ]; then ids_match=true; else ids_match=false; fi; { printf 'first_image_id=%s\n' "$$first_image_id"; printf 'second_image_id=%s\n' "$$second_image_id"; printf 'ids_match=%s\n' "$$ids_match"; } > build/reports/build-fixture-digests.txt; cat build/reports/build-fixture-digests.txt
+
+test-image:
+	BUILD_FIXTURE_IMAGE="$(BUILD_FIXTURE_IMAGE)" python -m pytest tests/supply-chain
 
 compose-up-postgres:
 	docker compose up -d postgres
