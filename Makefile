@@ -96,6 +96,8 @@ export ARGOCD_OIDC_CLIENT_SECRET ?= local-dev-argocd-oidc-secret
 export ARGOCD_PORT ?= 18083
 export BUILD_FIXTURE_IMAGE ?= ml-platform-study/build-fixture:local
 export BUILD_FIXTURE_SECRET_VALUE ?= fixture-build-secret-value
+export SYFT_VERSION ?= v1.50.0
+export SYFT_IMAGE ?= docker.io/anchore/syft:$(SYFT_VERSION)@sha256:1288ea4c8b38767b4e620c1e312c8cb26b6e887a99b4f07ab6cd19fc6f225026
 export KEYCLOAK_VERSION ?= 26.6.4
 export KEYCLOAK_IMAGE ?= quay.io/keycloak/keycloak:$(KEYCLOAK_VERSION)
 export KEYCLOAK_NAMESPACE ?= ml-platform-system
@@ -118,7 +120,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops build-fixture test-image
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops build-fixture test-image sbom-fixture test-sbom
 test:
 	python -m pytest
 
@@ -142,6 +144,16 @@ build-fixture:
 
 test-image:
 	BUILD_FIXTURE_IMAGE="$(BUILD_FIXTURE_IMAGE)" python -m pytest tests/supply-chain
+
+sbom-fixture: build-fixture
+	@mkdir -p config/syft
+	@docker image inspect "$(BUILD_FIXTURE_IMAGE)" --format '{{.Id}}' > config/syft/build-fixture.image-id
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$(SYFT_IMAGE)" "$(BUILD_FIXTURE_IMAGE)" -o cyclonedx-json > config/syft/build-fixture.cdx.json
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$(SYFT_IMAGE)" "$(BUILD_FIXTURE_IMAGE)" -o spdx-json > config/syft/build-fixture.spdx.json
+	python config/syft/annotate_fixture_sbom.py config/syft/build-fixture.cdx.json config/syft/build-fixture.spdx.json config/syft/build-fixture-application.json config/syft/build-fixture.image-id
+
+test-sbom:
+	BUILD_FIXTURE_IMAGE="$(BUILD_FIXTURE_IMAGE)" python -m pytest tests/supply-chain/sbom
 
 compose-up-postgres:
 	docker compose up -d postgres

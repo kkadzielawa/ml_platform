@@ -1,0 +1,6 @@
+{
+  "application_name": "build-fixture",
+  "image": "ml-platform-study/build-fixture:local",
+  "expected_path": "/opt/ml-platform/build-fixture/app.py",
+  "purpose": "Records the first-party application artifact expected to appear in the fixture image SBOM."
+}
