@@ -168,6 +168,73 @@ make cluster-create && make cluster-status
 
 stable instead of timing-sensitive.
 
+## Argo CD apply was blocked by a broken kind worker
+
+### Symptom
+
+During `02.08.a`, `make apply-gitops` repeatedly failed before Argo CD could finish installing. The visible failure came from the Envoy Gateway Helm dependency:
+
+```text
+UPGRADE FAILED: pre-upgrade hooks failed
+job eg-gateway-helm-certgen failed: BackoffLimitExceeded
+```
+
+Other platform pods on the same worker showed DNS or service-connection failures, including Keycloak failing to reach Postgres and Harbor components failing to resolve peer services.
+
+### Cause
+
+The Argo CD manifests were not the root cause. One kind worker was unhealthy:
+
+```text
+ml-platform-study-dev-worker2
+  kube-proxy: CrashLoopBackOff
+```
+
+The kube-proxy log showed:
+
+```text
+failed complete: too many open files
+```
+
+Because kube-proxy programs Kubernetes Service networking on each node, pods scheduled onto that worker could be alive while cluster Service routing was broken. Helm hook jobs for Envoy Gateway kept landing on the bad worker and failed there.
+
+### Resolution
+
+Restarting the Docker node container helped some pods but did not fix kube-proxy:
+
+```bash
+docker restart ml-platform-study-dev-worker2
+```
+
+Cordoning the worker avoided new pods, but it made the existing cluster-status script fail because the node reported `Ready,SchedulingDisabled`.
+
+The practical workaround was to keep the node `Ready` while steering generic new pods away from it with a `NoSchedule` taint:
+
+```bash
+kubectl --context kind-ml-platform-study-dev taint node ml-platform-study-dev-worker2 ml-platform.local/workload-class=ml:NoSchedule --overwrite
+```
+
+Then roll back the failed Envoy Gateway Helm release metadata and rerun the apply:
+
+```bash
+helm rollback eg 10 -n ml-platform-system --wait --timeout 5m
+make apply-gitops
+```
+
+After the taint, the Envoy Gateway hook scheduled onto the healthy worker, the dependency chain completed, and Argo CD installed successfully.
+
+### Follow-up
+
+The taint is acceptable as a local lab workaround, but the worker should be repaired or the kind cluster recreated before relying on the `ml` worker for later heavier workloads.
+
+Useful checks:
+
+```bash
+kubectl --context kind-ml-platform-study-dev get pods -n kube-system -o wide
+kubectl --context kind-ml-platform-study-dev logs -n kube-system -l k8s-app=kube-proxy --tail=80 --prefix=true
+kubectl --context kind-ml-platform-study-dev get events -n ml-platform-system --sort-by=.metadata.creationTimestamp
+```
+
 
 ## Kubernetes admission policy did not reject project pods
 
