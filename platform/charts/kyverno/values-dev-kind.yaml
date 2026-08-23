@@ -1,0 +1,71 @@
+# Local-kind Kyverno values for 02.14.
+#
+# This is intentionally small and non-HA. Later issues can introduce
+# production sizing, metrics, policy reports, and upgrade strategy.
+
+admissionController:
+  replicas: 1
+  metricsService:
+    create: false
+  initContainer:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 256Mi
+  container:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 384Mi
+
+backgroundController:
+  enabled: false
+  replicas: 1
+  metricsService:
+    create: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+
+cleanupController:
+  enabled: false
+  replicas: 1
+  metricsService:
+    create: false
+  resources:
+    requests:
+      cpu: 25m
+      memory: 96Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+reportsController:
+  enabled: false
+  replicas: 1
+  metricsService:
+    create: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+
+features:
+  policyExceptions:
+    enabled: true
+    namespace: "*"
+  policyReports:
+    enabled: false

@@ -1,0 +1,46 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-project-signed-images
+  annotations:
+    policies.kyverno.io/title: Verify Project Signed Images
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/minversion: 1.7.0
+    ml-platform.local/rollout-mode: enforce-project-namespaces
+    ml-platform.local/actionable-message: >-
+      Project pods using ghcr.io/kyverno/test-verify-image must use an image signed
+      by the trusted study Cosign key. Use :signed for the allow-path lab or publish
+      a valid signature before deploying.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookTimeoutSeconds: 30
+  failurePolicy: Fail
+  rules:
+    - name: verify-kyverno-test-image-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  ml-platform.local/namespace-class: project
+      verifyImages:
+        - imageReferences:
+            - ghcr.io/kyverno/test-verify-image*
+          mutateDigest: true
+          required: true
+          verifyDigest: true
+          attestors:
+            - entries:
+                - keys:
+                    publicKeys: |-
+                      -----BEGIN PUBLIC KEY-----
+                      MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE8nXRh950IZbRj8Ra/N9sbqOPZrfM
+                      5/KAQN0/KjHcorm/J5yctVd7iEcnessRQjU917hmKO6JWVGHpDguIyakZA==
+                      -----END PUBLIC KEY-----
+                    rekor:
+                      ignoreTlog: true

@@ -94,6 +94,11 @@ export ARGOCD_NAMESPACE ?= ml-platform-gitops
 export ARGOCD_CHART_REPO ?= https://argoproj.github.io/argo-helm
 export ARGOCD_OIDC_CLIENT_SECRET ?= local-dev-argocd-oidc-secret
 export ARGOCD_PORT ?= 18083
+export KYVERNO_CHART_VERSION ?= 3.8.2
+export KYVERNO_APP_VERSION ?= v1.18.2
+export KYVERNO_RELEASE ?= kyverno
+export KYVERNO_NAMESPACE ?= ml-platform-system
+export KYVERNO_CHART_REPO ?= https://kyverno.github.io/kyverno
 export BUILD_FIXTURE_IMAGE ?= ml-platform-study/build-fixture:local
 export BUILD_FIXTURE_SECRET_VALUE ?= fixture-build-secret-value
 export SYFT_VERSION ?= v1.50.0
@@ -125,7 +130,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy sign-fixture verify-fixture
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops apply-admission-policy test-admission-policy build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy sign-fixture verify-fixture
 test:
 	python -m pytest
 
@@ -406,3 +411,13 @@ apply-gitops: apply-keycloak
 
 test-gitops:
 	@RUN_GITOPS_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) ARGOCD_NAMESPACE=$(ARGOCD_NAMESPACE) ARGOCD_PORT=$(ARGOCD_PORT) python -m pytest tests/integration/gitops
+
+apply-admission-policy: apply-namespaces
+	@if command -v helm >/dev/null; then helm upgrade --install $(KYVERNO_RELEASE) kyverno --repo $(KYVERNO_CHART_REPO) --version $(KYVERNO_CHART_VERSION) --namespace $(KYVERNO_NAMESPACE) --create-namespace --values platform/charts/kyverno/values-dev-kind.yaml --wait --timeout 5m; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(KYVERNO_RELEASE) kyverno --repo $(KYVERNO_CHART_REPO) --version $(KYVERNO_CHART_VERSION) --namespace $(KYVERNO_NAMESPACE) --create-namespace --values platform/charts/kyverno/values-dev-kind.yaml --wait --timeout 5m; fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(KYVERNO_NAMESPACE) deployment/$(KYVERNO_RELEASE)-admission-controller --for=condition=Available
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k platform/policies/supply-chain
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=3m clusterpolicy/verify-project-signed-images --for=condition=Ready
+	@echo "Kyverno admission policy installed. Project namespaces enforce signed-image checks; platform namespaces remain audit rollout."
+
+test-admission-policy:
+	@RUN_ADMISSION_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) python -m pytest tests/integration/admission

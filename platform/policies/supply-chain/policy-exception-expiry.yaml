@@ -1,0 +1,48 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-policy-exception-expiry
+  annotations:
+    policies.kyverno.io/title: Require Policy Exception Expiry
+    policies.kyverno.io/category: Policy Governance
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: PolicyException
+    ml-platform.local/rollout-mode: enforce-project-governance
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: require-expires-on-annotation
+      match:
+        any:
+          - resources:
+              kinds:
+                - PolicyException
+      validate:
+        message: >-
+          Policy exceptions must include metadata.annotations["ml-platform.local/expires-on"]
+          in YYYY-MM-DD format so temporary unsigned-image bypasses cannot become permanent.
+        pattern:
+          metadata:
+            annotations:
+              ml-platform.local/expires-on: "?*"
+    - name: require-expires-on-date-shape
+      match:
+        any:
+          - resources:
+              kinds:
+                - PolicyException
+      preconditions:
+        all:
+          - key: "{{ request.object.metadata.annotations.\"ml-platform.local/expires-on\" || '' }}"
+            operator: NotEquals
+            value: ""
+      validate:
+        message: >-
+          Policy exception expiry must look like YYYY-MM-DD.
+        deny:
+          conditions:
+            all:
+              - key: "{{ regex_match('^[0-9]{4}-[0-9]{2}-[0-9]{2}$', request.object.metadata.annotations.\"ml-platform.local/expires-on\") }}"
+                operator: Equals
+                value: false

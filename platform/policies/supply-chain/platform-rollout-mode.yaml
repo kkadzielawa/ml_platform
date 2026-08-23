@@ -1,0 +1,35 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: document-platform-supply-chain-rollout
+  annotations:
+    policies.kyverno.io/title: Platform Supply Chain Rollout Mode
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/subject: Namespace
+    ml-platform.local/rollout-mode: audit-platform-namespaces
+    ml-platform.local/explanation: >-
+      Platform namespaces are not hard-enforced in 02.14 so controllers installed
+      before image-signing maturity are not accidentally blocked. Later issues can
+      migrate these namespaces from audit to enforce.
+spec:
+  validationFailureAction: Audit
+  background: true
+  rules:
+    - name: record-platform-rollout-mode
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              selector:
+                matchLabels:
+                  ml-platform.local/namespace-class: platform
+      validate:
+        message: >-
+          Platform namespaces are in audit rollout mode for signed-image enforcement
+          during 02.14.
+        pattern:
+          metadata:
+            labels:
+              ml-platform.local/namespace-class: platform
