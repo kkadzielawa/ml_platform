@@ -98,6 +98,8 @@ export BUILD_FIXTURE_IMAGE ?= ml-platform-study/build-fixture:local
 export BUILD_FIXTURE_SECRET_VALUE ?= fixture-build-secret-value
 export SYFT_VERSION ?= v1.50.0
 export SYFT_IMAGE ?= docker.io/anchore/syft:$(SYFT_VERSION)@sha256:1288ea4c8b38767b4e620c1e312c8cb26b6e887a99b4f07ab6cd19fc6f225026
+export TRIVY_VERSION ?= 0.72.0
+export TRIVY_IMAGE ?= docker.io/aquasec/trivy:$(TRIVY_VERSION)@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
 export KEYCLOAK_VERSION ?= 26.6.4
 export KEYCLOAK_IMAGE ?= quay.io/keycloak/keycloak:$(KEYCLOAK_VERSION)
 export KEYCLOAK_NAMESPACE ?= ml-platform-system
@@ -120,7 +122,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops build-fixture test-image sbom-fixture test-sbom
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy
 test:
 	python -m pytest
 
@@ -154,6 +156,13 @@ sbom-fixture: build-fixture
 
 test-sbom:
 	BUILD_FIXTURE_IMAGE="$(BUILD_FIXTURE_IMAGE)" python -m pytest tests/supply-chain/sbom
+
+scan-fixture: sbom-fixture
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$(CURDIR):/workspace:ro" "$(TRIVY_IMAGE)" image --config /workspace/config/trivy/trivy.yaml --format json --scanners vuln,secret --ignore-unfixed=false "$(BUILD_FIXTURE_IMAGE)" > config/trivy/build-fixture.scan.json
+	python config/license-policy/check_policy.py config/license-policy/policy.json config/syft/build-fixture.spdx.json config/trivy/build-fixture.scan.json
+
+test-scan-policy:
+	python -m pytest tests/supply-chain/policy
 
 compose-up-postgres:
 	docker compose up -d postgres

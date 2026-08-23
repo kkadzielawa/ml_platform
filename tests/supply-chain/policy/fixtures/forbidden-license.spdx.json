@@ -1,0 +1,16 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "forbidden-license-fixture",
+  "packages": [
+    {
+      "name": "bad-license-package",
+      "SPDXID": "SPDXRef-Package-bad-license-package",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "AGPL-3.0-only",
+      "licenseDeclared": "AGPL-3.0-only",
+      "copyrightText": "NOASSERTION"
+    }
+  ]
+}

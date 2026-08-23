@@ -1,0 +1,10 @@
+scan:
+  scanners:
+    - vuln
+    - secret
+
+vulnerability:
+  ignore-unfixed: false
+
+secret:
+  config: config/trivy/secret-rules.yaml

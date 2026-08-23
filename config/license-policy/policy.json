@@ -1,0 +1,25 @@
+{
+  "allowed_license_expressions": [
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MIT",
+    "NOASSERTION",
+    "Python-2.0"
+  ],
+  "forbidden_license_expressions": [
+    "AGPL-3.0-only",
+    "AGPL-3.0-or-later",
+    "SSPL-1.0",
+    "BUSL-1.1"
+  ],
+  "severity_exception_schema": {
+    "id": "stable exception identifier",
+    "owner": "team or person accountable for the exception",
+    "reason": "why the exception is acceptable for study use",
+    "expires_on": "YYYY-MM-DD",
+    "scope": "package, image, CVE, secret rule, or license expression"
+  },
+  "exceptions": []
+}
