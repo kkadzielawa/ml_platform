@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/ml-platform-study/contracts/data-asset.schema.json",
+  "title": "Data Asset Metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "asset_id",
+    "asset_type",
+    "classification",
+    "owner",
+    "storage",
+    "version",
+    "checksums",
+    "schema",
+    "license",
+    "provenance",
+    "retention"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\.0\\.0$"
+    },
+    "asset_id": {
+      "$ref": "#/$defs/portableName"
+    },
+    "asset_type": {
+      "type": "string",
+      "enum": [
+        "dataset",
+        "dataset-split",
+        "schema",
+        "run-manifest",
+        "run-metrics",
+        "model-artifact",
+        "evaluation-artifact",
+        "backup",
+        "supply-chain-evidence",
+        "secret-reference",
+        "observability-artifact"
+      ]
+    },
+    "classification": {
+      "type": "string",
+      "enum": ["public", "internal", "confidential", "restricted"]
+    },
+    "owner": {
+      "$ref": "#/$defs/portableName"
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bucket", "prefix"],
+      "properties": {
+        "bucket": {
+          "type": "string",
+          "enum": [
+            "ml-platform-public",
+            "ml-platform-internal",
+            "ml-platform-confidential",
+            "ml-platform-restricted"
+          ]
+        },
+        "prefix": {
+          "$ref": "#/$defs/objectPrefix"
+        }
+      }
+    },
+    "version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "value", "immutable"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["dataset-version", "semantic-version", "registry-version", "run-id", "timestamp"]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "immutable": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    },
+    "checksums": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "algorithm", "value"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "^(?!/)(?!.*//)(?!.*\\.\\.)(?!.*(?:password|passwd|secret|token|credential|apikey|api-key|email|user|konrad))[A-Za-z0-9][A-Za-z0-9/_=.,@+-]*$"
+          },
+          "algorithm": {
+            "type": "string",
+            "enum": ["sha256"]
+          },
+          "value": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "uri"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/portableName"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "uri": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "expression", "review_status"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["spdx", "custom", "unknown"]
+        },
+        "expression": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "review_status": {
+          "type": "string",
+          "enum": ["accepted", "review-required", "rejected", "unknown"]
+        },
+        "attribution_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_type", "source_uri", "created_at"],
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "enum": ["synthetic", "public-download", "generated", "internal-upload", "derived"]
+        },
+        "source_uri": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "created_at": {
+          "$ref": "#/$defs/isoTimestamp"
+        },
+        "code_commit": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "parent_assets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/portableName"
+          }
+        },
+        "run_id": {
+          "type": ["string", "null"],
+          "pattern": "^run-\\d{8}t\\d{6}z-[0-9a-f]{8}$"
+        }
+      }
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "retain_until", "delete_after_expiry"],
+      "properties": {
+        "policy": {
+          "type": "string",
+          "enum": ["indefinite", "one-year", "one-hundred-eighty-days", "thirty-days", "custom"]
+        },
+        "retain_until": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "delete_after_expiry": {
+          "type": "boolean"
+        }
+      }
+    },
+    "restricted_controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["raw_value_logging_allowed", "redaction_required"],
+      "properties": {
+        "raw_value_logging_allowed": {
+          "type": "boolean",
+          "const": false
+        },
+        "redaction_required": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "classification": {
+            "const": "restricted"
+          }
+        }
+      },
+      "then": {
+        "required": ["restricted_controls"],
+        "properties": {
+          "storage": {
+            "properties": {
+              "bucket": {
+                "const": "ml-platform-restricted"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "portableName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 63,
+      "pattern": "^(?!.*(?:password|passwd|secret|token|credential|apikey|api-key|email|user|konrad))[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "objectPrefix": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*//)(?!.*\\.\\.)(?!.*(?:password|passwd|secret|token|credential|apikey|api-key|email|user|konrad))[a-z0-9][a-z0-9/_=.-]*/$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "isoTimestamp": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    }
+  }
+}
