@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-retention-policy
+  namespace: ml-platform-data
+  labels:
+    app.kubernetes.io/name: data-storage
+    app.kubernetes.io/component: retention-policy
+data:
+  retention.yaml: |
+    schema_version: "1.0.0"
+    backend: garage
+    encryption:
+      supported:
+        rpc_encryption:
+          status: enabled
+          reason: Garage requires rpc_secret for inter-node RPC encryption.
+        sse_c:
+          status: supported
+          reason: Garage supports S3 SSE-C when clients provide encryption keys per request.
+        client_side_encryption:
+          status: supported
+          reason: Clients may encrypt payloads before PUT and manage keys outside object storage.
+      unsupported:
+        sse_s3:
+          status: unsupported
+          reason: Garage does not support server-managed SSE-S3 default bucket encryption.
+        sse_kms:
+          status: unsupported
+          reason: Garage does not provide AWS KMS-compatible bucket encryption.
+        external_kms:
+          status: out-of-scope
+          reason: External KMS integration is a later production-grade concern.
+      required_by_classification:
+        public: none
+        internal: transport-protection-and-access-control
+        confidential: sse-c-or-client-side-encryption-for-sensitive-payloads
+        restricted: client-side-encryption-required-before-object-storage
+    lifecycle:
+      simulation_only: true
+      destructive_delete_enabled: false
+      rules:
+        raw:
+          bucket: ml-platform-raw
+          prefix: projects/ml-platform/raw/
+          review_after_days: 30
+          expire_after_days: 365
+          protected_prefixes:
+            - projects/ml-platform/raw/smoke/
+            - projects/ml-platform/raw/fixtures/
+        curated:
+          bucket: ml-platform-curated
+          prefix: projects/ml-platform/curated/
+          review_after_days: 180
+          expire_after_days: 730
+          protected_prefixes:
+            - projects/ml-platform/curated/smoke/
+            - projects/ml-platform/curated/fixtures/
+        artifacts:
+          bucket: ml-platform-artifacts
+          prefix: projects/ml-platform/artifacts/
+          review_after_days: 365
+          expire_after_days: 1095
+          protected_prefixes:
+            - projects/ml-platform/artifacts/smoke/
+            - projects/ml-platform/artifacts/fixtures/
+            - projects/ml-platform/artifacts/manifests/
+        models:
+          bucket: ml-platform-models
+          prefix: projects/ml-platform/models/
+          review_after_days: 180
+          expire_after_days: null
+          protected_prefixes:
+            - projects/ml-platform/models/smoke/
+            - projects/ml-platform/models/fixtures/
+            - projects/ml-platform/models/housing-sale-baseline/
+        evaluation:
+          bucket: ml-platform-evaluation
+          prefix: projects/ml-platform/evaluation/
+          review_after_days: 180
+          expire_after_days: 730
+          protected_prefixes:
+            - projects/ml-platform/evaluation/smoke/
+            - projects/ml-platform/evaluation/fixtures/

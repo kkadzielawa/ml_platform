@@ -130,7 +130,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-data-storage test-data-storage-access apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops apply-admission-policy test-admission-policy e2e-phase-02 build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy sign-fixture verify-fixture
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-data-storage test-data-storage-access test-data-retention apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops apply-admission-policy test-admission-policy e2e-phase-02 build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy sign-fixture verify-fixture
 test:
 	python -m pytest
 
@@ -303,6 +303,9 @@ apply-data-storage: apply-object-storage
 
 test-data-storage-access:
 	RUN_DATA_STORAGE_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) CLUSTER_GARAGE_NAMESPACE=$(CLUSTER_GARAGE_NAMESPACE) CLUSTER_GARAGE_PORT=$(CLUSTER_GARAGE_PORT) GARAGE_S3_REGION=$(GARAGE_S3_REGION) GARAGE_S3_ENDPOINT=http://127.0.0.1:$(CLUSTER_GARAGE_PORT) python -m pytest tests/integration/data_storage
+
+test-data-retention:
+	python -m pytest tests/integration/data_storage/retention
 
 apply-registry: apply-namespaces
 	@kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic harbor-admin --namespace $(HARBOR_NAMESPACE) --from-literal=HARBOR_ADMIN_PASSWORD="$(HARBOR_ADMIN_PASSWORD)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
