@@ -99,6 +99,16 @@ export KYVERNO_APP_VERSION ?= v1.18.2
 export KYVERNO_RELEASE ?= kyverno
 export KYVERNO_NAMESPACE ?= ml-platform-system
 export KYVERNO_CHART_REPO ?= https://kyverno.github.io/kyverno
+export LAKEFS_CHART_VERSION ?= 1.12.25
+export LAKEFS_APP_VERSION ?= 1.86.0
+export LAKEFS_RELEASE ?= lakefs
+export LAKEFS_NAMESPACE ?= ml-platform-data
+export LAKEFS_CHART_REPO ?= https://charts.lakefs.io
+export LAKEFS_PORT ?= 18084
+export LAKEFS_ADMIN_USERNAME ?= lakefs-admin
+export LAKEFS_ADMIN_ACCESS_KEY ?= LAKEFS03333333333333333333
+export LAKEFS_ADMIN_SECRET_KEY ?= lakefs-admin-secret-033333333333333333333333333333333333333333
+export LAKEFS_AUTH_ENCRYPT_SECRET_KEY ?= 8888888888888888888888888888888888888888888888888888888888888888
 export BUILD_FIXTURE_IMAGE ?= ml-platform-study/build-fixture:local
 export BUILD_FIXTURE_SECRET_VALUE ?= fixture-build-secret-value
 export SYFT_VERSION ?= v1.50.0
@@ -130,7 +140,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-data-storage test-data-storage-access test-data-retention apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops apply-admission-policy test-admission-policy e2e-phase-02 build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy sign-fixture verify-fixture
+.PHONY: test test-versions test-contracts test-baseline-data test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-data-storage test-data-storage-access test-data-retention apply-lakefs test-lakefs apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops apply-admission-policy test-admission-policy e2e-phase-02 build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy sign-fixture verify-fixture
 test:
 	python -m pytest
 
@@ -306,6 +316,17 @@ test-data-storage-access:
 
 test-data-retention:
 	python -m pytest tests/integration/data_storage/retention
+
+apply-lakefs: apply-postgres apply-data-storage
+	@kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic lakefs-secrets --namespace $(LAKEFS_NAMESPACE) --from-literal=database_connection_string="postgres://$(CLUSTER_POSTGRES_USER):$(CLUSTER_POSTGRES_PASSWORD)@$(CLUSTER_POSTGRES_NAME)-rw.$(CLUSTER_POSTGRES_NAMESPACE).svc.cluster.local:5432/$(CLUSTER_POSTGRES_DATABASE)?sslmode=disable" --from-literal=auth_encrypt_secret_key="$(LAKEFS_AUTH_ENCRYPT_SECRET_KEY)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	@kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic lakefs-admin-credentials --namespace $(LAKEFS_NAMESPACE) --from-literal=username="$(LAKEFS_ADMIN_USERNAME)" --from-literal=access-key-id="$(LAKEFS_ADMIN_ACCESS_KEY)" --from-literal=secret-access-key="$(LAKEFS_ADMIN_SECRET_KEY)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	@if command -v helm >/dev/null; then helm upgrade --install $(LAKEFS_RELEASE) lakefs --repo $(LAKEFS_CHART_REPO) --version $(LAKEFS_CHART_VERSION) --namespace $(LAKEFS_NAMESPACE) --create-namespace --values platform/charts/lakefs/values-dev-kind.yaml --wait --timeout 5m; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(LAKEFS_RELEASE) lakefs --repo $(LAKEFS_CHART_REPO) --version $(LAKEFS_CHART_VERSION) --namespace $(LAKEFS_NAMESPACE) --create-namespace --values platform/charts/lakefs/values-dev-kind.yaml --wait --timeout 5m; fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(LAKEFS_NAMESPACE) deployment/$(LAKEFS_RELEASE) --for=condition=Available
+	@echo "lakeFS service: $(LAKEFS_RELEASE).$(LAKEFS_NAMESPACE).svc.cluster.local:80"
+	@echo "Local access: kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward -n $(LAKEFS_NAMESPACE) svc/$(LAKEFS_RELEASE) $(LAKEFS_PORT):80"
+
+test-lakefs:
+	RUN_LAKEFS_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) LAKEFS_NAMESPACE=$(LAKEFS_NAMESPACE) LAKEFS_PORT=$(LAKEFS_PORT) LAKEFS_ADMIN_USERNAME=$(LAKEFS_ADMIN_USERNAME) python -m pytest tests/integration/lakefs
 
 apply-registry: apply-namespaces
 	@kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic harbor-admin --namespace $(HARBOR_NAMESPACE) --from-literal=HARBOR_ADMIN_PASSWORD="$(HARBOR_ADMIN_PASSWORD)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
