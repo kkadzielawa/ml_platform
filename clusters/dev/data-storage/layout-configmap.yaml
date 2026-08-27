@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-storage-layout
+  namespace: ml-platform-data
+  labels:
+    app.kubernetes.io/name: data-storage
+    app.kubernetes.io/component: object-layout
+data:
+  scopes.yaml: |
+    scopes:
+      raw:
+        bucket: ml-platform-raw
+        prefix: projects/ml-platform/raw/
+        owner: data-ingestion
+        default_classification: confidential
+      curated:
+        bucket: ml-platform-curated
+        prefix: projects/ml-platform/curated/
+        owner: data-curation
+        default_classification: confidential
+      artifacts:
+        bucket: ml-platform-artifacts
+        prefix: projects/ml-platform/artifacts/
+        owner: ml-platform-runtime
+        default_classification: internal
+      models:
+        bucket: ml-platform-models
+        prefix: projects/ml-platform/models/
+        owner: model-platform
+        default_classification: confidential
+      evaluation:
+        bucket: ml-platform-evaluation
+        prefix: projects/ml-platform/evaluation/
+        owner: evaluation-platform
+        default_classification: confidential
