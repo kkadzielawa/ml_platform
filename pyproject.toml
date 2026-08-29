@@ -15,6 +15,9 @@ data = [
   "polars>=1.43.2,<1.44",
   "pyarrow>=25.0.1,<26",
 ]
+data-quality = [
+  "great-expectations>=1.21.0,<1.22",
+]
 test = [
   "pytest>=8.0,<9.0",
   "PyYAML>=6.0,<7.0",

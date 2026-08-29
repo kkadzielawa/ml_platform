@@ -1,0 +1,122 @@
+schema_version: "1.0.0"
+suite_name: housing-sale-curated
+dataset_id: housing-sale-features
+expectations:
+  - id: required-columns
+    expectation_type: expect_table_columns_to_match_ordered_list
+    kwargs:
+      column_list:
+        - listing_id
+        - split
+        - ingest_date
+        - listing_price_usd
+        - square_feet
+        - price_per_square_foot
+        - bedrooms
+        - bathrooms
+        - home_age_years
+        - home_age_bucket
+        - school_rating
+        - walk_score
+        - mortgage_rate_percent
+        - property_type
+        - market_temperature
+        - sold_within_30_days
+  - id: row-count
+    expectation_type: expect_table_row_count_to_be_between
+    kwargs:
+      min_value: 240
+      max_value: 240
+  - id: unique-listing-id
+    expectation_type: expect_column_values_to_be_unique
+    kwargs:
+      column: listing_id
+  - id: listing-id-format
+    expectation_type: expect_column_values_to_match_regex
+    kwargs:
+      column: listing_id
+      regex: "^listing-[0-9]{4}$"
+  - id: non-null-required-columns
+    expectation_type: expect_column_values_to_not_be_null
+    kwargs:
+      columns:
+        - listing_id
+        - split
+        - ingest_date
+        - listing_price_usd
+        - square_feet
+        - price_per_square_foot
+        - bedrooms
+        - bathrooms
+        - home_age_years
+        - home_age_bucket
+        - school_rating
+        - walk_score
+        - mortgage_rate_percent
+        - property_type
+        - market_temperature
+        - sold_within_30_days
+  - id: numeric-ranges
+    expectation_type: expect_column_values_to_be_between
+    kwargs:
+      ranges:
+        listing_price_usd:
+          min_value: 160000
+          max_value: 1250000
+        square_feet:
+          min_value: 650
+          max_value: 3600
+        price_per_square_foot:
+          min_value: 40
+          max_value: 1200
+        bedrooms:
+          min_value: 1
+          max_value: 5
+        bathrooms:
+          min_value: 1.0
+          max_value: 3.5
+        home_age_years:
+          min_value: 0
+          max_value: 95
+        school_rating:
+          min_value: 1
+          max_value: 10
+        walk_score:
+          min_value: 0
+          max_value: 100
+        mortgage_rate_percent:
+          min_value: 5.0
+          max_value: 8.5
+  - id: categorical-values
+    expectation_type: expect_column_values_to_be_in_set
+    kwargs:
+      value_sets:
+        split:
+          - train
+          - test
+        property_type:
+          - condo
+          - townhouse
+          - single-family
+        market_temperature:
+          - cool
+          - balanced
+          - hot
+        home_age_bucket:
+          - newer
+          - established
+          - older
+        sold_within_30_days:
+          - 0
+          - 1
+  - id: leakage-oriented-feature-names
+    expectation_type: expect_feature_names_to_avoid_target_leakage_terms
+    kwargs:
+      target_column: sold_within_30_days
+      forbidden_terms:
+        - target
+        - label
+        - sold
+        - sale
+        - closed
+        - days_on_market

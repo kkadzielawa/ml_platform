@@ -98,3 +98,10 @@ components:
     version: "25.0.1"
     source_url: https://pypi.org/project/pyarrow/25.0.1/
     notes: "Parquet engine dependency for Polars writes and local Parquet interoperability."
+
+  - name: great-expectations
+    kind: python-package
+    phase: "03"
+    version: "1.21.0"
+    source_url: https://pypi.org/project/great-expectations/1.21.0/
+    notes: "Selected route 03.07.a for local data quality checks and machine-readable validation results."
