@@ -77,3 +77,24 @@ components:
       reference: docker.io/grafana/grafana:13.1.0@sha256:6ea068891652aa6a65ca9065c26b89de939653803c836426970305c11fd00534
       os: linux
       architecture: amd64
+
+  - name: polars
+    kind: python-package
+    phase: "03"
+    version: "1.43.2"
+    source_url: https://pypi.org/project/polars/1.43.2/
+    notes: "Used by 03.06 for deterministic local dataframe transforms."
+
+  - name: duckdb
+    kind: python-package
+    phase: "03"
+    version: "1.5.5"
+    source_url: https://pypi.org/project/duckdb/1.5.5/
+    notes: "Used by 03.06 to validate Parquet outputs with SQL without loading full datasets into Python memory."
+
+  - name: pyarrow
+    kind: python-package
+    phase: "03"
+    version: "25.0.1"
+    source_url: https://pypi.org/project/pyarrow/25.0.1/
+    notes: "Parquet engine dependency for Polars writes and local Parquet interoperability."

@@ -30,3 +30,6 @@ dist/
 # Local editor and OS noise
 .DS_Store
 Thumbs.db
+
+# Generated example outputs
+examples/data_transform/output/
