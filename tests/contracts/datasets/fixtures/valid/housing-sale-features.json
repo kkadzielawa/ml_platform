@@ -1,0 +1,121 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_id": "housing-sale-features",
+  "version": "v0001",
+  "classification": "public",
+  "owner": "data-study",
+  "storage": {
+    "bucket": "ml-platform-curated",
+    "prefix": "projects/ml-platform/curated/housing-sale-features/versions/v0001/"
+  },
+  "format": {
+    "type": "parquet",
+    "compression": "zstd",
+    "row_group_target_mib": 128
+  },
+  "partitions": {
+    "columns": ["split", "ingest_date"],
+    "template": "split={split}/ingest_date={ingest_date}/"
+  },
+  "schema": {
+    "name": "housing-sale-features",
+    "version": "1.0.0",
+    "fields": [
+      {
+        "name": "property_id",
+        "type": "string",
+        "nullable": false,
+        "description": "Stable synthetic property identifier.",
+        "categorical": {
+          "encoding": "none"
+        }
+      },
+      {
+        "name": "listed_at",
+        "type": "timestamp",
+        "nullable": false,
+        "description": "Synthetic listing timestamp normalized to UTC.",
+        "timestamp": {
+          "timezone": "UTC",
+          "unit": "us"
+        },
+        "categorical": {
+          "encoding": "none"
+        }
+      },
+      {
+        "name": "property_type",
+        "type": "string",
+        "nullable": false,
+        "description": "Synthetic property type category.",
+        "categorical": {
+          "encoding": "dictionary",
+          "allowed_values": ["single-family", "townhouse", "condo"],
+          "unknown_value": null
+        }
+      },
+      {
+        "name": "bedrooms",
+        "type": "int32",
+        "nullable": false,
+        "description": "Bedroom count.",
+        "categorical": {
+          "encoding": "none"
+        }
+      },
+      {
+        "name": "sale_price",
+        "type": "float64",
+        "nullable": true,
+        "description": "Synthetic sale price label; null before sale.",
+        "categorical": {
+          "encoding": "none"
+        }
+      }
+    ]
+  },
+  "evolution": {
+    "compatibility": "backward",
+    "compatible_changes": [
+      {
+        "change": "add-nullable-field",
+        "reason": "Readers can ignore optional new features."
+      },
+      {
+        "change": "add-categorical-value",
+        "reason": "Consumers must tolerate unseen property types."
+      }
+    ],
+    "breaking_changes": [
+      {
+        "change": "remove-field",
+        "reason": "Existing training code may depend on a removed column."
+      },
+      {
+        "change": "change-timestamp-timezone",
+        "reason": "Timestamp comparisons would become ambiguous."
+      }
+    ]
+  },
+  "files": {
+    "target_file_size_mib": 128,
+    "max_file_size_mib": 512,
+    "allow_small_files": true,
+    "estimated_file_count": 2
+  },
+  "checksums": {
+    "mode": "manifest",
+    "algorithm": "sha256",
+    "manifest": "projects/ml-platform/curated/housing-sale-features/versions/v0001/checksums.sha256"
+  },
+  "license": {
+    "kind": "spdx",
+    "expression": "CC0-1.0",
+    "review_status": "accepted"
+  },
+  "provenance": {
+    "source_type": "synthetic",
+    "source_uri": "examples/sklearn_baseline/data/generate_dataset.py",
+    "created_at": "2026-08-27T00:00:00Z"
+  }
+}
