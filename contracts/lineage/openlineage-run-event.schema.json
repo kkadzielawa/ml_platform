@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/ml-platform-study/contracts/lineage/openlineage-run-event.schema.json",
+  "title": "Study OpenLineage RunEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventTime",
+    "producer",
+    "schemaURL",
+    "eventType",
+    "run",
+    "job",
+    "inputs",
+    "outputs"
+  ],
+  "properties": {
+    "eventTime": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+    },
+    "producer": {
+      "type": "string",
+      "pattern": "^https://github\\.com/kkadzielawa/ml_platform"
+    },
+    "schemaURL": {
+      "type": "string",
+      "pattern": "^https://openlineage\\.io/spec/"
+    },
+    "eventType": {
+      "type": "string",
+      "enum": ["START", "COMPLETE", "FAIL"]
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "facets"],
+      "properties": {
+        "runId": {
+          "type": "string",
+          "pattern": "^run-\\d{8}t\\d{6}z-[0-9a-f]{8}$"
+        },
+        "facets": {
+          "type": "object"
+        }
+      }
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "name", "facets"],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 3
+        },
+        "name": {
+          "type": "string",
+          "minLength": 3
+        },
+        "facets": {
+          "type": "object"
+        }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dataset"
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dataset"
+      }
+    }
+  },
+  "$defs": {
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "name", "facets"],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "pattern": "^(s3|file|https)://[^\\s]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "facets": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

@@ -19,6 +19,7 @@ from ml_platform.data import write_baseline_parquet_dataset
 from ml_platform.data.transforms import DATASET_ID, DATASET_VERSION, prefixed_sha256
 from ml_platform.data_quality import validate_housing_sale_dataset
 from ml_platform.ingestion.lakefs_client import LakeFSClient, LakeFSNotFoundError
+from ml_platform.lineage import build_complete_event, build_fail_event, build_ingestion_start_event
 from ml_platform.run_manifest.validation import validate_manifest
 
 
@@ -42,6 +43,10 @@ class LakeFSLike(Protocol):
     def get_object(self, repository: str, ref: str, path: str) -> bytes: ...
     def commit(self, repository: str, branch: str, *, message: str, metadata: dict[str, str]) -> str: ...
     def merge(self, repository: str, source_ref: str, destination_branch: str) -> None: ...
+
+
+class LineageCollectorLike(Protocol):
+    def emit(self, event: dict) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -70,10 +75,12 @@ def run_baseline_ingestion(
     storage_namespace: str | None = None,
     output_manifest_path: Path = DEFAULT_OUTPUT_PATH,
     client: LakeFSLike | None = None,
+    lineage_collector: LineageCollectorLike | None = None,
 ) -> BaselineIngestionResult:
     """Ingest baseline CSV files into lakeFS and emit a universal run manifest."""
 
     started_at = utc_now()
+    run_id = build_run_id(started_at)
     source_paths = {split: Path(path) for split, path in (input_paths or DEFAULT_INPUT_PATHS).items()}
     source_checksums = {split: prefixed_sha256(path) for split, path in sorted(source_paths.items())}
     source_revision_id = source_revision(source_checksums)
@@ -81,86 +88,114 @@ def run_baseline_ingestion(
     storage_namespace = storage_namespace or f"s3://ml-platform-artifacts/lakefs/{repository}/"
     lakefs = client or LakeFSClient.from_environment()
 
-    lakefs.setup()
-    lakefs.ensure_repository(repository, storage_namespace=storage_namespace)
-
-    existing_dataset = matching_curated_dataset(lakefs, repository, source_checksums)
-    if existing_dataset is not None:
-        finished_at = utc_now()
-        manifest = build_run_manifest(
-            started_at=started_at,
-            finished_at=finished_at,
+    source_uris = [f"s3://ml-platform-artifacts/lakefs/{repository}/{RAW_PREFIX}/{split}.csv" for split in sorted(source_paths)]
+    emit_lineage(
+        lineage_collector,
+        build_ingestion_start_event(
+            run_id=run_id,
+            started_at=isoformat_z(started_at),
             repository=repository,
-            branch=None,
-            source_checksums=source_checksums,
-            source_revision_id=source_revision_id,
-            lakefs_commit_id=existing_dataset.commit_id,
-            no_op=True,
-            total_rows=existing_dataset.total_rows,
-            output_checksum=existing_dataset.metadata_checksum,
-        )
-        write_valid_manifest(manifest, output_manifest_path)
+            source_uris=source_uris,
+            source_revision=source_revision_id,
+        ),
+    )
+
+    try:
+        lakefs.setup()
+        lakefs.ensure_repository(repository, storage_namespace=storage_namespace)
+
+        existing_dataset = matching_curated_dataset(lakefs, repository, source_checksums)
+        if existing_dataset is not None:
+            finished_at = utc_now()
+            manifest = build_run_manifest(
+                run_id=run_id,
+                started_at=started_at,
+                finished_at=finished_at,
+                repository=repository,
+                branch=None,
+                source_checksums=source_checksums,
+                source_revision_id=source_revision_id,
+                lakefs_commit_id=existing_dataset.commit_id,
+                no_op=True,
+                total_rows=existing_dataset.total_rows,
+                output_checksum=existing_dataset.metadata_checksum,
+            )
+            write_valid_manifest(manifest, output_manifest_path)
+            emit_lineage(lineage_collector, build_complete_event(manifest))
+            return BaselineIngestionResult(
+                run_id=manifest["run_id"],
+                repository=repository,
+                branch=None,
+                lakefs_commit_id=existing_dataset.commit_id,
+                manifest_path=output_manifest_path,
+                no_op=True,
+            )
+
+        with tempfile.TemporaryDirectory(prefix="ml-platform-ingest-") as tmp:
+            tmp_dir = Path(tmp)
+            curated_dir = tmp_dir / "curated"
+            transform_result = write_baseline_parquet_dataset(source_paths, curated_dir)
+            quality_result = validate_housing_sale_dataset(transform_result.output_dir)
+            if not quality_result.success:
+                raise ValueError("baseline data-quality validation failed; lakeFS commit was not created")
+
+            source_ref = lakefs.branch_head(repository, "main") or "main"
+            create_branch_from_source(lakefs, repository, branch, source_ref)
+
+            for split, path in source_paths.items():
+                lakefs.upload_file(repository, branch, f"{RAW_PREFIX}/{split}.csv", path)
+            for path in sorted(transform_result.output_dir.glob("**/*")):
+                if path.is_file():
+                    lakefs.upload_file(repository, branch, f"{CURATED_PREFIX}/{path.relative_to(transform_result.output_dir).as_posix()}", path)
+
+            commit_id = lakefs.commit(
+                repository,
+                branch,
+                message=f"ingest {DATASET_ID} {DATASET_VERSION}",
+                metadata={
+                    "issue": "03.08",
+                    "dataset_id": DATASET_ID,
+                    "dataset_version": DATASET_VERSION,
+                    "source_revision": source_revision_id,
+                },
+            )
+            lakefs.merge(repository, commit_id, "main")
+            finished_at = utc_now()
+            manifest = build_run_manifest(
+                run_id=run_id,
+                started_at=started_at,
+                finished_at=finished_at,
+                repository=repository,
+                branch=branch,
+                source_checksums=source_checksums,
+                source_revision_id=source_revision_id,
+                lakefs_commit_id=commit_id,
+                no_op=False,
+                total_rows=transform_result.metadata["total_rows"],
+                output_checksum=transform_result.metadata["metadata_sha256"],
+            )
+            write_valid_manifest(manifest, output_manifest_path)
+            emit_lineage(lineage_collector, build_complete_event(manifest))
+
         return BaselineIngestionResult(
             run_id=manifest["run_id"],
             repository=repository,
-            branch=None,
-            lakefs_commit_id=existing_dataset.commit_id,
-            manifest_path=output_manifest_path,
-            no_op=True,
-        )
-
-    with tempfile.TemporaryDirectory(prefix="ml-platform-ingest-") as tmp:
-        tmp_dir = Path(tmp)
-        curated_dir = tmp_dir / "curated"
-        transform_result = write_baseline_parquet_dataset(source_paths, curated_dir)
-        quality_result = validate_housing_sale_dataset(transform_result.output_dir)
-        if not quality_result.success:
-            raise ValueError("baseline data-quality validation failed; lakeFS commit was not created")
-
-        source_ref = lakefs.branch_head(repository, "main") or "main"
-        create_branch_from_source(lakefs, repository, branch, source_ref)
-
-        for split, path in source_paths.items():
-            lakefs.upload_file(repository, branch, f"{RAW_PREFIX}/{split}.csv", path)
-        for path in sorted(transform_result.output_dir.glob("**/*")):
-            if path.is_file():
-                lakefs.upload_file(repository, branch, f"{CURATED_PREFIX}/{path.relative_to(transform_result.output_dir).as_posix()}", path)
-
-        commit_id = lakefs.commit(
-            repository,
-            branch,
-            message=f"ingest {DATASET_ID} {DATASET_VERSION}",
-            metadata={
-                "issue": "03.08",
-                "dataset_id": DATASET_ID,
-                "dataset_version": DATASET_VERSION,
-                "source_revision": source_revision_id,
-            },
-        )
-        lakefs.merge(repository, commit_id, "main")
-        finished_at = utc_now()
-        manifest = build_run_manifest(
-            started_at=started_at,
-            finished_at=finished_at,
-            repository=repository,
             branch=branch,
-            source_checksums=source_checksums,
-            source_revision_id=source_revision_id,
             lakefs_commit_id=commit_id,
+            manifest_path=output_manifest_path,
             no_op=False,
-            total_rows=transform_result.metadata["total_rows"],
-            output_checksum=transform_result.metadata["metadata_sha256"],
         )
-        write_valid_manifest(manifest, output_manifest_path)
-
-    return BaselineIngestionResult(
-        run_id=manifest["run_id"],
-        repository=repository,
-        branch=branch,
-        lakefs_commit_id=commit_id,
-        manifest_path=output_manifest_path,
-        no_op=False,
-    )
+    except Exception as exc:
+        emit_lineage(
+            lineage_collector,
+            build_fail_event(
+                run_id=run_id,
+                started_at=isoformat_z(started_at),
+                input_uris=source_uris,
+                message=str(exc),
+            ),
+        )
+        raise
 
 
 def create_branch_from_source(client: LakeFSLike, repository: str, branch: str, source_ref: str) -> None:
@@ -207,6 +242,7 @@ def write_valid_manifest(manifest: dict, path: Path) -> None:
 
 def build_run_manifest(
     *,
+    run_id: str,
     started_at: datetime,
     finished_at: datetime,
     repository: str,
@@ -218,7 +254,6 @@ def build_run_manifest(
     total_rows: int,
     output_checksum: str,
 ) -> dict:
-    run_id = f"run-{started_at.strftime('%Y%m%dt%H%M%Sz')}-{uuid.uuid4().hex[:8]}"
     source_uri = f"s3://ml-platform-artifacts/lakefs/{repository}/{RAW_PREFIX}/"
     target_uri = f"s3://ml-platform-artifacts/lakefs/{repository}/{CURATED_PREFIX}/"
     return {
@@ -340,6 +375,15 @@ def build_run_manifest(
 def source_revision(source_checksums: dict[str, str]) -> str:
     payload = json.dumps(source_checksums, sort_keys=True).encode("utf-8")
     return f"sha256:{hashlib.sha256(payload).hexdigest()}"
+
+
+def build_run_id(started_at: datetime) -> str:
+    return f"run-{started_at.strftime('%Y%m%dt%H%M%Sz')}-{uuid.uuid4().hex[:8]}"
+
+
+def emit_lineage(lineage_collector: LineageCollectorLike | None, event: dict) -> None:
+    if lineage_collector is not None:
+        lineage_collector.emit(event)
 
 
 def git_code_metadata() -> dict:
