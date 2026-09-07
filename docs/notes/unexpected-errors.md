@@ -360,3 +360,95 @@ For the local study cluster:
 2. raise the `ml-platform-system` dev quota from `3 CPU / 4Gi / 50 secrets` to `5 CPU / 6Gi / 80 secrets`.
 
 This keeps quota pressure visible while allowing the platform service stack to run on the laptop.
+
+## OpenMetadata dependencies exceeded namespace quota
+
+### Symptom
+
+During `03.10`, the OpenMetadata dependency Helm release timed out while installing OpenSearch. The OpenSearch pod could not create its init containers because the namespace quota rejected it.
+
+### Cause
+
+The `ml-platform-data` namespace has a `LimitRange`. OpenSearch's chart-defined init containers did not set explicit resources, so Kubernetes defaulted them to the namespace maximum. That made a small local init container look like it needed far more CPU and memory than intended.
+
+### Resolution
+
+Set explicit low resource requests and limits for the OpenSearch init containers in the local OpenMetadata dependency values. This keeps the study deployment inside the laptop-sized namespace quota while still making resource usage explicit.
+
+## OpenMetadata chart still required an Airflow secret
+
+### Symptom
+
+OpenMetadata started with:
+
+```text
+Init:CreateContainerConfigError
+secret "airflow-secrets" not found
+```
+
+even though the local study values disabled Airflow and pipeline-service deployment.
+
+### Cause
+
+The upstream OpenMetadata chart still referenced the Airflow password Secret from generated pod environment configuration.
+
+### Resolution
+
+Create a dummy local `airflow-secrets` Secret in `make apply-openmetadata`. Airflow remains disabled; the secret only satisfies the chart's remaining reference.
+
+## OpenMetadata table ownership used plural `owners`
+
+### Symptom
+
+The baseline catalog table registered successfully, but the live integration test could not see an owner. Adding singular `owner` to the table upsert body failed with:
+
+```text
+Invalid request format
+```
+
+Using a JSON Patch against `/owner` then failed because the OpenMetadata `Table` entity schema did not recognize `owner`.
+
+### Cause
+
+OpenMetadata `1.13.x` uses plural `owners` on table entities. The normal table lookup also omits owners unless requested with `fields=owners`.
+
+### Resolution
+
+Register the table first, then patch `/owners` using the table patch API:
+
+```text
+PATCH /api/v1/tables/name/{fqn}?changeSource=Automated
+Content-Type: application/json-patch+json
+```
+
+The live test now requests `fields=owners` and verifies that `platform-learners` owns the seeded baseline table.
+
+## OpenMetadata browser SSO redirected to an internal Kubernetes name
+
+### Symptom
+
+Selecting the Keycloak sign-in option from a browser redirected to:
+
+```text
+http://keycloak.ml-platform-system.svc.cluster.local:8080/...
+```
+
+The address works for pods but not for Firefox on the laptop. `kubectl port-forward` also emitted
+occasional `broken pipe` messages when the browser abandoned a connection; those messages were
+noise rather than the cause of the failed login.
+
+### Cause
+
+OpenMetadata obtains its authorization and token endpoints from the OIDC discovery document. An
+internal discovery URL therefore caused the login endpoint to issue a browser redirect to the
+internal Keycloak Service name. Changing only OpenMetadata's `authority` did not change that
+discovery-derived redirect. OpenMetadata also stores its authentication configuration in its own
+PostgreSQL database, so updating Helm values alone does not update an existing installation.
+
+### Resolution
+
+Deploy `openmetadata-oidc-discovery-adapter` in the OpenMetadata namespace. It requests Keycloak
+discovery with the local browser host header, leaves authorization and logout endpoints at
+`127.0.0.1:18081`, and rewrites token, user-info, introspection, revocation, and JWKS endpoints to
+an in-cluster proxy route. `sync_oidc_configuration.py` idempotently updates the persisted
+authority and discovery URL, then restarts only the OpenMetadata pod when a change occurred.

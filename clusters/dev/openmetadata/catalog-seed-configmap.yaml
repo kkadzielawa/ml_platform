@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openmetadata-baseline-catalog-seed
+  namespace: ml-platform-data
+  labels:
+    app.kubernetes.io/name: openmetadata-baseline-catalog-seed
+    app.kubernetes.io/component: metadata-catalog-seed
+data:
+  baseline-catalog.json: |
+    {
+      "owner": {
+        "name": "platform-learners",
+        "type": "team"
+      },
+      "service": {
+        "name": "ml-platform-lakefs",
+        "serviceType": "CustomDatabase",
+        "description": "Study lakeFS repository cataloged as a logical database service."
+      },
+      "database": {
+        "name": "housing-sale-ingestion",
+        "service": "ml-platform-lakefs",
+        "description": "lakeFS repository containing raw and curated housing-sale study datasets."
+      },
+      "schema": {
+        "name": "curated",
+        "database": "ml-platform-lakefs.housing-sale-ingestion",
+        "description": "Curated datasets that passed deterministic transform and quality gates."
+      },
+      "table": {
+        "name": "housing-sale-features-v0001",
+        "displayName": "Housing sale features v0001",
+        "databaseSchema": "ml-platform-lakefs.housing-sale-ingestion.curated",
+        "tableType": "External",
+        "description": "Curated Parquet feature dataset produced by issue 03.08 versioned ingestion.",
+        "columns": [
+          {"name": "listing_id", "dataType": "VARCHAR", "dataLength": 64, "description": "Stable listing identifier."},
+          {"name": "split", "dataType": "VARCHAR", "dataLength": 16, "description": "Train or test split."},
+          {"name": "ingest_date", "dataType": "DATE", "description": "Deterministic study ingest date."},
+          {"name": "listing_price_usd", "dataType": "INT", "description": "Listing price in USD."},
+          {"name": "square_feet", "dataType": "INT", "description": "Home size."},
+          {"name": "price_per_square_foot", "dataType": "DOUBLE", "description": "Derived price density feature."},
+          {"name": "bedrooms", "dataType": "INT", "description": "Bedroom count."},
+          {"name": "bathrooms", "dataType": "DOUBLE", "description": "Bathroom count."},
+          {"name": "home_age_years", "dataType": "INT", "description": "Age of the home."},
+          {"name": "home_age_bucket", "dataType": "VARCHAR", "dataLength": 32, "description": "Derived age bucket."},
+          {"name": "school_rating", "dataType": "INT", "description": "Local school rating."},
+          {"name": "walk_score", "dataType": "INT", "description": "Walkability score."},
+          {"name": "mortgage_rate_percent", "dataType": "DOUBLE", "description": "Mortgage-rate feature."},
+          {"name": "property_type", "dataType": "VARCHAR", "dataLength": 32, "description": "Property category."},
+          {"name": "market_temperature", "dataType": "VARCHAR", "dataLength": 32, "description": "Local market category."},
+          {"name": "sold_within_30_days", "dataType": "INT", "description": "Binary study target."}
+        ]
+      },
+      "quality": {
+        "suite": "housing_sale_features_quality",
+        "result": "pass",
+        "source": "config/great_expectations/housing_sale_suite.yaml"
+      },
+      "lineage": {
+        "run": "baseline-versioned-ingestion",
+        "inputs": [
+          "s3://ml-platform-artifacts/lakefs/housing-sale-ingestion/raw/housing-sale/v0001/train.csv",
+          "s3://ml-platform-artifacts/lakefs/housing-sale-ingestion/raw/housing-sale/v0001/test.csv"
+        ],
+        "outputs": [
+          "s3://ml-platform-artifacts/lakefs/housing-sale-ingestion/curated/housing-sale-features/v0001/"
+        ]
+      }
+    }

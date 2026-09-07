@@ -1,0 +1,39 @@
+global:
+  security:
+    allowInsecureImages: true
+
+mysql:
+  enabled: false
+
+airflow:
+  enabled: false
+
+opensearch:
+  enabled: true
+  fullnameOverride: opensearch
+  clusterName: opensearch
+  singleNode: true
+  replicas: 1
+  opensearchJavaOpts: "-Xms512m -Xmx512m"
+  initResources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+  persistence:
+    enabled: true
+    imageTag: "1.36.1"
+    size: 2Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1536Mi
+  config:
+    opensearch.yml: |
+      plugins.security.disabled: true
+      indices.query.bool.max_clause_count: 4096

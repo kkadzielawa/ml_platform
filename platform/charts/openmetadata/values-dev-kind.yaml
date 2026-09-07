@@ -1,0 +1,119 @@
+replicaCount: 1
+
+openmetadata:
+  config:
+    logLevel: INFO
+    clusterName: openmetadata-study
+
+    elasticsearch:
+      enabled: true
+      host: opensearch
+      searchType: opensearch
+      port: 9200
+      scheme: http
+      auth:
+        enabled: false
+
+    database:
+      enabled: true
+      host: openmetadata-postgres-rw.ml-platform-data.svc.cluster.local
+      port: 5432
+      driverClass: org.postgresql.Driver
+      dbScheme: postgresql
+      databaseName: openmetadata
+      auth:
+        username: openmetadata
+        password:
+          secretRef: openmetadata-postgres-app
+          secretKey: password
+      dbParams: "useSSL=false&serverTimezone=UTC"
+      maxSize: 10
+      minSize: 1
+      initialSize: 1
+
+    pipelineServiceClientConfig:
+      enabled: false
+
+    deployPipelinesConfig:
+      enabled: false
+
+    reindexConfig:
+      enabled: true
+
+    authorizer:
+      enabled: true
+      className: org.openmetadata.service.security.DefaultAuthorizer
+      containerRequestFilter: org.openmetadata.service.security.JwtFilter
+      initialAdmins:
+        - admin
+        - oidc-admin
+      allowedEmailRegistrationDomains:
+        - all
+      principalDomain: ml-platform.local
+      allowedDomains:
+        - ml-platform.local
+      enforcePrincipalDomain: false
+      useRolesFromProvider: true
+
+    authentication:
+      enabled: true
+      clientType: confidential
+      provider: custom-oidc
+      publicKeys:
+        - http://keycloak.ml-platform-system.svc.cluster.local:8080/realms/ml-platform-study/protocol/openid-connect/certs
+        - http://openmetadata.ml-platform-data.svc.cluster.local:8585/api/v1/system/config/jwks
+      # The authority is used to build the browser redirect. The local
+      # Keycloak port-forward makes this address reachable from Firefox.
+      authority: http://127.0.0.1:18081/realms/ml-platform-study
+      clientId: openmetadata
+      callbackUrl: http://127.0.0.1:8585/callback
+      responseType: code
+      jwtPrincipalClaims:
+        - email
+        - preferred_username
+        - sub
+      enableSelfSignup: true
+      oidcConfiguration:
+        enabled: true
+        oidcType: Keycloak
+        clientId:
+          secretRef: openmetadata-oidc-client
+          secretKey: clientId
+        clientSecret:
+          secretRef: openmetadata-oidc-client
+          secretKey: clientSecret
+        scope: openid email profile
+        # The adapter preserves the browser-facing authorization endpoint and
+        # exposes Keycloak token and JWKS endpoints to the server in-cluster.
+        discoveryUri: http://openmetadata-oidc-discovery-adapter.ml-platform-data.svc.cluster.local:8080/realms/ml-platform-study/.well-known/openid-configuration
+        useNonce: true
+        preferredJwsAlgorithm: RS256
+        responseType: code
+        disablePkce: true
+        callbackUrl: http://127.0.0.1:8585/callback
+        serverUrl: http://127.0.0.1:8585
+        clientAuthenticationMethod: client_secret_post
+        tenant: ""
+        maxClockSkew: ""
+        customParams: "{}"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 768Mi
+  limits:
+    # The saved 100m / 96Mi is reserved for the OIDC discovery adapter in the
+    # same laptop-sized namespace quota.
+    cpu: 400m
+    memory: 1440Mi
+
+service:
+  type: ClusterIP
+  port: 8585
+  adminPort: 8586
+
+ingress:
+  enabled: false
+
+gateway:
+  enabled: false

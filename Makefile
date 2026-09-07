@@ -109,6 +109,21 @@ export LAKEFS_ADMIN_USERNAME ?= lakefs-admin
 export LAKEFS_ADMIN_ACCESS_KEY ?= LAKEFS03333333333333333333
 export LAKEFS_ADMIN_SECRET_KEY ?= lakefs-admin-secret-033333333333333333333333333333333333333333
 export LAKEFS_AUTH_ENCRYPT_SECRET_KEY ?= 8888888888888888888888888888888888888888888888888888888888888888
+export OPENMETADATA_CHART_VERSION ?= 1.13.4
+export OPENMETADATA_APP_VERSION ?= 1.13.4
+export OPENMETADATA_DEPENDENCIES_CHART_VERSION ?= 1.13.4
+export OPENMETADATA_RELEASE ?= openmetadata
+export OPENMETADATA_DEPENDENCIES_RELEASE ?= openmetadata-dependencies
+export OPENMETADATA_NAMESPACE ?= ml-platform-data
+export OPENMETADATA_CHART_REPO ?= https://helm.open-metadata.org
+export OPENMETADATA_PORT ?= 8585
+export OPENMETADATA_DB_NAME ?= openmetadata
+export OPENMETADATA_DB_USER ?= openmetadata
+export OPENMETADATA_DB_PASSWORD ?= local-dev-openmetadata-postgres-password
+export OPENMETADATA_ADMIN_USERNAME ?= admin
+export OPENMETADATA_ADMIN_PASSWORD ?= local-dev-openmetadata-admin-password
+export OPENMETADATA_OIDC_CLIENT_SECRET ?= local-dev-openmetadata-oidc-secret
+export OPENMETADATA_AIRFLOW_PASSWORD ?= unused-local-dev-openmetadata-airflow-password
 export BUILD_FIXTURE_IMAGE ?= ml-platform-study/build-fixture:local
 export BUILD_FIXTURE_SECRET_VALUE ?= fixture-build-secret-value
 export SYFT_VERSION ?= v1.50.0
@@ -140,7 +155,7 @@ export CLUSTER_POSTGRES_PASSWORD ?= local-dev-cluster-postgres-password
 export CLUSTER_GARAGE_NAMESPACE ?= ml-platform-data
 export CLUSTER_GARAGE_PORT ?= 13900
 
-.PHONY: test test-versions test-contracts test-dataset-contracts test-baseline-data test-data-transforms test-data-quality test-ingestion test-openlineage test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability transform-baseline-data ingest-baseline train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-data-storage test-data-storage-access test-data-retention apply-lakefs test-lakefs apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops apply-admission-policy test-admission-policy e2e-phase-02 build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy sign-fixture verify-fixture
+.PHONY: test test-versions test-contracts test-dataset-contracts test-baseline-data test-data-transforms test-data-quality test-ingestion test-openlineage test-openmetadata test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability transform-baseline-data ingest-baseline train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-data-storage test-data-storage-access test-data-retention apply-lakefs test-lakefs apply-openmetadata apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops apply-admission-policy test-admission-policy e2e-phase-02 build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy sign-fixture verify-fixture
 test:
 	python -m pytest
 
@@ -167,6 +182,9 @@ test-ingestion:
 
 test-openlineage:
 	python -m pytest tests/integration/lineage
+
+test-openmetadata:
+	python -m pytest tests/integration/openmetadata
 
 test-manifests:
 	python -m pytest tests/manifests
@@ -348,6 +366,21 @@ apply-lakefs: apply-postgres apply-data-storage
 
 test-lakefs:
 	RUN_LAKEFS_INTEGRATION=1 KIND_CLUSTER_NAME=$(KIND_CLUSTER_NAME) LAKEFS_NAMESPACE=$(LAKEFS_NAMESPACE) LAKEFS_PORT=$(LAKEFS_PORT) LAKEFS_ADMIN_USERNAME=$(LAKEFS_ADMIN_USERNAME) python -m pytest tests/integration/lakefs
+
+apply-openmetadata: apply-keycloak apply-postgres
+	@kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic openmetadata-postgres-app --namespace $(OPENMETADATA_NAMESPACE) --type=kubernetes.io/basic-auth --from-literal=username="$(OPENMETADATA_DB_USER)" --from-literal=password="$(OPENMETADATA_DB_PASSWORD)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	@kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic openmetadata-oidc-client --namespace $(OPENMETADATA_NAMESPACE) --from-literal=clientId="openmetadata" --from-literal=clientSecret="$(OPENMETADATA_OIDC_CLIENT_SECRET)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	@kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic airflow-secrets --namespace $(OPENMETADATA_NAMESPACE) --from-literal=openmetadata-airflow-password="$(OPENMETADATA_AIRFLOW_PASSWORD)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/openmetadata
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(OPENMETADATA_NAMESPACE) cluster/openmetadata-postgres --for=condition=Ready
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(OPENMETADATA_NAMESPACE) deployment/openmetadata-oidc-discovery-adapter --for=condition=Available
+	OPENMETADATA_OIDC_CLIENT_SECRET="$(OPENMETADATA_OIDC_CLIENT_SECRET)" OPENMETADATA_ADMIN_USERNAME="$(OPENMETADATA_ADMIN_USERNAME)" OPENMETADATA_ADMIN_PASSWORD="$(OPENMETADATA_ADMIN_PASSWORD)" OPENMETADATA_PORT="$(OPENMETADATA_PORT)" KEYCLOAK_PORT="$(KEYCLOAK_PORT)" KIND_CLUSTER_NAME="$(KIND_CLUSTER_NAME)" KEYCLOAK_NAMESPACE="$(KEYCLOAK_NAMESPACE)" python clusters/dev/openmetadata/register_openmetadata_oidc.py
+	@if command -v helm >/dev/null; then helm upgrade --install $(OPENMETADATA_DEPENDENCIES_RELEASE) openmetadata-dependencies --repo $(OPENMETADATA_CHART_REPO) --version $(OPENMETADATA_DEPENDENCIES_CHART_VERSION) --namespace $(OPENMETADATA_NAMESPACE) --create-namespace --values platform/charts/openmetadata/values-dependencies-dev-kind.yaml --wait --timeout 10m --history-max 3; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(OPENMETADATA_DEPENDENCIES_RELEASE) openmetadata-dependencies --repo $(OPENMETADATA_CHART_REPO) --version $(OPENMETADATA_DEPENDENCIES_CHART_VERSION) --namespace $(OPENMETADATA_NAMESPACE) --create-namespace --values platform/charts/openmetadata/values-dependencies-dev-kind.yaml --wait --timeout 10m --history-max 3; fi
+	@if command -v helm >/dev/null; then helm upgrade --install $(OPENMETADATA_RELEASE) openmetadata --repo $(OPENMETADATA_CHART_REPO) --version $(OPENMETADATA_CHART_VERSION) --namespace $(OPENMETADATA_NAMESPACE) --create-namespace --values platform/charts/openmetadata/values-dev-kind.yaml --wait --timeout 10m --history-max 3; else if [ ! -f "$(KUBECONFIG)" ]; then echo "helm is not installed and KUBECONFIG does not point to a readable file: $(KUBECONFIG)"; exit 127; fi; docker run --rm --network host -v "$(KUBECONFIG):/root/.kube/config:ro" -v "$(CURDIR):/workspace" -w /workspace "$(HELM_RUNNER_IMAGE)" upgrade --install $(OPENMETADATA_RELEASE) openmetadata --repo $(OPENMETADATA_CHART_REPO) --version $(OPENMETADATA_CHART_VERSION) --namespace $(OPENMETADATA_NAMESPACE) --create-namespace --values platform/charts/openmetadata/values-dev-kind.yaml --wait --timeout 10m --history-max 3; fi
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(OPENMETADATA_NAMESPACE) deployment/$(OPENMETADATA_RELEASE) --for=condition=Available
+	KIND_CLUSTER_NAME="$(KIND_CLUSTER_NAME)" OPENMETADATA_NAMESPACE="$(OPENMETADATA_NAMESPACE)" python clusters/dev/openmetadata/sync_oidc_configuration.py
+	OPENMETADATA_ADMIN_USERNAME="$(OPENMETADATA_ADMIN_USERNAME)" OPENMETADATA_ADMIN_PASSWORD="$(OPENMETADATA_ADMIN_PASSWORD)" OPENMETADATA_PORT="$(OPENMETADATA_PORT)" KEYCLOAK_PORT="$(KEYCLOAK_PORT)" KIND_CLUSTER_NAME="$(KIND_CLUSTER_NAME)" KEYCLOAK_NAMESPACE="$(KEYCLOAK_NAMESPACE)" OPENMETADATA_NAMESPACE="$(OPENMETADATA_NAMESPACE)" python clusters/dev/openmetadata/register_baseline_metadata.py
+	@echo "OpenMetadata UI: kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward -n $(OPENMETADATA_NAMESPACE) svc/$(OPENMETADATA_RELEASE) $(OPENMETADATA_PORT):8585"
 
 apply-registry: apply-namespaces
 	@kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic harbor-admin --namespace $(HARBOR_NAMESPACE) --from-literal=HARBOR_ADMIN_PASSWORD="$(HARBOR_ADMIN_PASSWORD)" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
