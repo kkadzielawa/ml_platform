@@ -4,7 +4,7 @@ Issue `03.10` introduces OpenMetadata OSS as the local metadata catalog.
 
 ## Purpose
 
-OpenMetadata is where the platform can search and explain data assets. In this study setup it catalogs the baseline housing-sale dataset, owner, schema, quality result, and lineage from raw CSV inputs to curated Parquet output.
+OpenMetadata is where the platform can search and explain data assets. In this study setup it catalogs the baseline housing-sale dataset, owner, schemas, an explicitly labelled quality fixture result, and lineage from raw CSV inputs to curated Parquet output.
 
 ## Local deployment shape
 
@@ -51,9 +51,14 @@ The browser and the OpenMetadata server are on different networks: the browser c
 local Keycloak port-forward, while the server must reach the Kubernetes Service. The
 `openmetadata-oidc-discovery-adapter` is a small internal reverse proxy that preserves the
 browser-facing authorization URL and rewrites only OIDC back-channel endpoints for the server.
-`make apply-openmetadata` waits for it and synchronizes the persisted OpenMetadata OIDC setting.
+Because the adapter mounts its NGINX configuration with a `subPath`, `make apply-openmetadata`
+explicitly restarts the adapter after applying its ConfigMap, waits for the replacement pod, and
+then synchronizes the persisted OpenMetadata OIDC setting. Reapplying therefore causes a brief
+adapter-only local interruption even when the configuration is unchanged.
 If an earlier deployment used a different OIDC route, rerun `make apply-openmetadata`; it restarts
-OpenMetadata only when the persisted setting needs to change.
+OpenMetadata only when the persisted setting needs to change. On a cold local JVM start, that
+replacement can take more than five minutes; the synchronizer waits for up to ten minutes and
+fails rather than reporting a successful configuration change before the server is ready.
 
 ## Catalog seed
 
@@ -68,9 +73,13 @@ It describes:
 - owner: `platform-learners`;
 - service: `ml-platform-lakefs`;
 - database/repository: `housing-sale-ingestion`;
+- raw schema and train/test input tables;
 - schema: `curated`;
 - table: `housing-sale-features-v0001`;
 - quality suite: `housing_sale_features_quality`;
+- quality evidence: `fixture` from the file-based suite declaration;
+- pipeline: `baseline-versioned-ingestion`;
+- lineage commit marker: `fixture-commit-0001`;
 - lineage inputs: raw train/test CSVs;
 - lineage output: curated Parquet dataset.
 
@@ -80,7 +89,7 @@ It describes:
 
 - `clusters/dev/openmetadata/register_openmetadata_oidc.py` registers the local OpenMetadata OIDC client and admin user in Keycloak.
 - `clusters/dev/openmetadata/sync_oidc_configuration.py` makes the persisted OpenMetadata OIDC authority and discovery URL match the local browser and cluster routes.
-- `clusters/dev/openmetadata/register_baseline_metadata.py` seeds the baseline catalog assets into OpenMetadata.
+- `clusters/dev/openmetadata/register_baseline_metadata.py` upserts the baseline catalog assets, quality test case/result, pipeline identity, and raw-to-curated lineage edges into OpenMetadata.
 
 For local study use, the baseline metadata script can open temporary port-forwards to Keycloak and OpenMetadata, request a local admin token, and register the seed payload without you manually copying a token.
 
@@ -99,6 +108,19 @@ OPENMETADATA_JWT_TOKEN=<token>
 ```
 
 Do not commit personal, bot, or copied UI tokens.
+
+The default `make test-openmetadata` command runs offline manifest checks and skips the live
+cluster test. To verify the deployed catalog and retrieve the registered quality and lineage
+entities, run:
+
+```bash
+RUN_OPENMETADATA_INTEGRATION=1 make test-openmetadata
+```
+
+The quality result is deliberately marked `fixture`; it proves the catalog registration path,
+not that OpenMetadata executed the local validator. A future measured quality report can replace
+the seed result without changing the catalog entity shape. The fixture has a fixed observed time,
+so rerunning registration reads and verifies the matching stored result instead of overwriting it.
 
 ## Notes
 

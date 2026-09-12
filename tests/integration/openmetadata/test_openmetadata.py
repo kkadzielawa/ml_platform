@@ -15,10 +15,18 @@ from typing import Any
 import pytest
 import yaml
 
-from clusters.dev.openmetadata.register_baseline_metadata import get_table_by_name, load_seed, local_openmetadata_session
+from clusters.dev.openmetadata.register_baseline_metadata import (
+    get_lineage_by_name,
+    get_quality_test_case_by_name,
+    get_table_by_name,
+    load_seed,
+    local_openmetadata_session,
+    table_fully_qualified_name,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+MAKEFILE_PATH = REPO_ROOT / "Makefile"
 VALUES_PATH = REPO_ROOT / "platform/charts/openmetadata/values-dev-kind.yaml"
 DEPENDENCY_VALUES_PATH = REPO_ROOT / "platform/charts/openmetadata/values-dependencies-dev-kind.yaml"
 OIDC_ADAPTER_PATH = REPO_ROOT / "clusters/dev/openmetadata/oidc-discovery-adapter.yaml"
@@ -84,6 +92,26 @@ def test_openmetadata_manifests_do_not_embed_runtime_secrets():
     assert "secretRef: openmetadata-postgres-app" in rendered
 
 
+def test_openmetadata_helm_routes_pin_the_kind_context():
+    makefile = MAKEFILE_PATH.read_text(encoding="utf-8")
+    openmetadata_recipe = makefile.split("apply-openmetadata:", 1)[1].split(
+        "apply-registry:", 1
+    )[0]
+
+    assert openmetadata_recipe.count("--kube-context kind-$(KIND_CLUSTER_NAME)") == 4
+    assert (
+        "rollout restart --namespace $(OPENMETADATA_NAMESPACE) "
+        "deployment/openmetadata-oidc-discovery-adapter"
+    ) in openmetadata_recipe
+
+
+def test_openmetadata_test_target_passes_the_local_token_password_without_echoing_it():
+    makefile = MAKEFILE_PATH.read_text(encoding="utf-8")
+    test_recipe = makefile.split("test-openmetadata:", 1)[1].split("test-manifests:", 1)[0]
+
+    assert test_recipe.startswith('\n\t@OPENMETADATA_ADMIN_PASSWORD="$(OPENMETADATA_ADMIN_PASSWORD)"')
+
+
 def test_baseline_catalog_seed_contains_owner_schema_quality_and_lineage():
     seed = load_seed()
 
@@ -91,8 +119,17 @@ def test_baseline_catalog_seed_contains_owner_schema_quality_and_lineage():
     assert seed["table"]["name"] == "housing-sale-features-v0001"
     assert seed["table"]["databaseSchema"] == "ml-platform-lakefs.housing-sale-ingestion.curated"
     assert len(seed["table"]["columns"]) == 16
+    assert seed["rawSchema"]["name"] == "raw"
+    assert {table["name"] for table in seed["rawTables"]} == {
+        "housing-sale-train-v0001",
+        "housing-sale-test-v0001",
+    }
     assert seed["quality"]["suite"] == "housing_sale_features_quality"
+    assert seed["quality"]["testCaseName"] == "housing_sale_features_quality_fixture"
     assert seed["quality"]["result"] == "pass"
+    assert seed["quality"]["evidence"] == "fixture"
+    assert seed["pipeline"]["name"] == seed["lineage"]["run"]
+    assert seed["lineage"]["commit"] == "fixture-commit-0001"
     assert seed["lineage"]["run"] == "baseline-versioned-ingestion"
     assert len(seed["lineage"]["inputs"]) == 2
     assert seed["lineage"]["outputs"] == [
@@ -145,16 +182,40 @@ def test_openmetadata_server_is_available_and_catalog_seed_configmap_exists():
     assert jwks["keys"]
 
     with local_openmetadata_session() as session:
+        table_fqn = table_fully_qualified_name(seed["table"])
         table = get_table_by_name(
             session.base_url,
             session.token,
-            f"{seed['table']['databaseSchema']}.{seed['table']['name']}",
+            table_fqn,
             fields="owners",
         )
+        quality = get_quality_test_case_by_name(
+            session.base_url,
+            session.token,
+            f"{table_fqn}.{seed['quality']['testCaseName']}",
+        )
+        lineage = get_lineage_by_name(session.base_url, session.token, table_fqn)
 
     assert table["name"] == seed["table"]["name"]
     assert table["owners"][0]["name"] == seed["owner"]["name"]
     assert len(table["columns"]) == len(seed["table"]["columns"])
+    assert quality["testCaseResult"]["testCaseStatus"] == "Success"
+    assert {item["name"]: item["value"] for item in quality["testCaseResult"]["testResultValue"]} == {
+        "evidence": "fixture",
+        "suite": seed["quality"]["suite"],
+        "dataset_revision": seed["lineage"]["commit"],
+        "run": seed["lineage"]["run"],
+    }
+
+    upstream_names = {node["name"] for node in lineage.get("nodes", [])}
+    assert upstream_names >= {table["name"] for table in seed["rawTables"]}
+    upstream_edges = lineage.get("upstreamEdges", [])
+    assert any(
+        seed["lineage"]["run"] in edge.get("lineageDetails", {}).get("description", "")
+        and seed["lineage"]["commit"] in edge.get("lineageDetails", {}).get("description", "")
+        and edge.get("lineageDetails", {}).get("pipeline", {}).get("name") == seed["pipeline"]["name"]
+        for edge in upstream_edges
+    )
 
 
 def openmetadata_paths() -> list[Path]:

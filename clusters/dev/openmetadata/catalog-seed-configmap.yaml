@@ -28,6 +28,55 @@ data:
         "database": "ml-platform-lakefs.housing-sale-ingestion",
         "description": "Curated datasets that passed deterministic transform and quality gates."
       },
+      "rawSchema": {
+        "name": "raw",
+        "database": "ml-platform-lakefs.housing-sale-ingestion",
+        "description": "Raw CSV inputs used by the versioned baseline ingestion run."
+      },
+      "rawTables": [
+        {
+          "name": "housing-sale-train-v0001",
+          "displayName": "Housing sale train v0001",
+          "databaseSchema": "ml-platform-lakefs.housing-sale-ingestion.raw",
+          "tableType": "External",
+          "description": "Raw train CSV input for baseline-versioned-ingestion.",
+          "columns": [
+            {"name": "listing_id", "dataType": "VARCHAR", "dataLength": 64},
+            {"name": "listing_price_usd", "dataType": "INT"},
+            {"name": "square_feet", "dataType": "INT"},
+            {"name": "bedrooms", "dataType": "INT"},
+            {"name": "bathrooms", "dataType": "DOUBLE"},
+            {"name": "home_age_years", "dataType": "INT"},
+            {"name": "school_rating", "dataType": "INT"},
+            {"name": "walk_score", "dataType": "INT"},
+            {"name": "mortgage_rate_percent", "dataType": "DOUBLE"},
+            {"name": "property_type", "dataType": "VARCHAR", "dataLength": 32},
+            {"name": "market_temperature", "dataType": "VARCHAR", "dataLength": 32},
+            {"name": "sold_within_30_days", "dataType": "INT"}
+          ]
+        },
+        {
+          "name": "housing-sale-test-v0001",
+          "displayName": "Housing sale test v0001",
+          "databaseSchema": "ml-platform-lakefs.housing-sale-ingestion.raw",
+          "tableType": "External",
+          "description": "Raw test CSV input for baseline-versioned-ingestion.",
+          "columns": [
+            {"name": "listing_id", "dataType": "VARCHAR", "dataLength": 64},
+            {"name": "listing_price_usd", "dataType": "INT"},
+            {"name": "square_feet", "dataType": "INT"},
+            {"name": "bedrooms", "dataType": "INT"},
+            {"name": "bathrooms", "dataType": "DOUBLE"},
+            {"name": "home_age_years", "dataType": "INT"},
+            {"name": "school_rating", "dataType": "INT"},
+            {"name": "walk_score", "dataType": "INT"},
+            {"name": "mortgage_rate_percent", "dataType": "DOUBLE"},
+            {"name": "property_type", "dataType": "VARCHAR", "dataLength": 32},
+            {"name": "market_temperature", "dataType": "VARCHAR", "dataLength": 32},
+            {"name": "sold_within_30_days", "dataType": "INT"}
+          ]
+        }
+      ],
       "table": {
         "name": "housing-sale-features-v0001",
         "displayName": "Housing sale features v0001",
@@ -55,11 +104,39 @@ data:
       },
       "quality": {
         "suite": "housing_sale_features_quality",
+        "testCaseName": "housing_sale_features_quality_fixture",
         "result": "pass",
-        "source": "config/great_expectations/housing_sale_suite.yaml"
+        "source": "config/great_expectations/housing_sale_suite.yaml",
+        "evidence": "fixture",
+        "observedAt": "2026-08-27T00:00:00Z"
+      },
+      "pipelineService": {
+        "name": "ml-platform-study-pipelines",
+        "serviceType": "CustomPipeline",
+        "description": "Logical OpenMetadata service for local study pipeline runs."
+      },
+      "pipeline": {
+        "name": "baseline-versioned-ingestion",
+        "service": "ml-platform-study-pipelines",
+        "displayName": "Baseline versioned ingestion",
+        "description": "Local run identity for the housing-sale lakeFS ingestion path.",
+        "tasks": [
+          {
+            "name": "transform-and-validate",
+            "taskType": "BatchTask",
+            "description": "Transform CSV inputs and execute the configured quality suite.",
+            "downstreamTasks": ["publish-curated-dataset"]
+          },
+          {
+            "name": "publish-curated-dataset",
+            "taskType": "BatchTask",
+            "description": "Commit raw and curated artifacts to lakeFS."
+          }
+        ]
       },
       "lineage": {
         "run": "baseline-versioned-ingestion",
+        "commit": "fixture-commit-0001",
         "inputs": [
           "s3://ml-platform-artifacts/lakefs/housing-sale-ingestion/raw/housing-sale/v0001/train.csv",
           "s3://ml-platform-artifacts/lakefs/housing-sale-ingestion/raw/housing-sale/v0001/test.csv"
