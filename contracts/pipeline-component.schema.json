@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/ml-platform-study/contracts/pipeline-component.schema.json",
+  "title": "Portable Pipeline Component Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "name", "stage", "image", "command", "inputs", "outputs", "execution", "logging", "provenance", "state"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1\\.0\\.0$"},
+    "name": {"$ref": "#/$defs/name"},
+    "stage": {"type": "string", "enum": ["snapshot", "validate", "transform", "train", "evaluate", "register", "batch-inference"]},
+    "image": {"type": "object", "additionalProperties": false, "required": ["repository", "digest"], "properties": {"repository": {"type": "string", "pattern": "^[a-z0-9][a-z0-9./_-]+$"}, "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}},
+    "command": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "inputs": {"type": "array", "items": {"$ref": "#/$defs/artifact"}},
+    "outputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifact"}},
+    "execution": {"type": "object", "additionalProperties": false, "required": ["timeout_seconds", "retry", "cancellation", "exit_codes"], "properties": {"timeout_seconds": {"type": "integer", "minimum": 1}, "retry": {"type": "object", "additionalProperties": false, "required": ["max_attempts", "retry_safety"], "properties": {"max_attempts": {"type": "integer", "minimum": 1, "maximum": 5}, "retry_safety": {"type": "string", "enum": ["idempotent", "deduplicated-output"]}}}, "cancellation": {"type": "object", "additionalProperties": false, "required": ["signal", "grace_period_seconds", "behavior"], "properties": {"signal": {"const": "SIGTERM"}, "grace_period_seconds": {"type": "integer", "minimum": 1}, "behavior": {"const": "stop-new-work-and-cleanup-local-state"}}}, "exit_codes": {"type": "object", "additionalProperties": false, "required": ["success", "cancelled", "retryable", "permanent_failure"], "properties": {"success": {"const": 0}, "cancelled": {"const": 130}, "retryable": {"const": 75}, "permanent_failure": {"const": 1}}}}},
+    "logging": {"type": "object", "additionalProperties": false, "required": ["format", "correlation_fields", "raw_data_logging"], "properties": {"format": {"const": "json-lines"}, "correlation_fields": {"type": "array", "minItems": 2, "items": {"type": "string", "enum": ["run_id", "component_name", "attempt"]}}, "raw_data_logging": {"const": false}}},
+    "provenance": {"type": "object", "additionalProperties": false, "required": ["run_manifest", "lineage"], "properties": {"run_manifest": {"const": "write-on-success-and-failure"}, "lineage": {"const": "emit-start-complete-fail"}}},
+    "state": {"type": "object", "additionalProperties": false, "required": ["shared_memory_required", "durable_state"], "properties": {"shared_memory_required": {"const": false}, "durable_state": {"const": "declared-artifacts-only"}}}
+  },
+  "$defs": {
+    "name": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+    "artifact": {"type": "object", "additionalProperties": false, "required": ["name", "kind", "uri"], "properties": {"name": {"$ref": "#/$defs/name"}, "kind": {"type": "string", "enum": ["dataset", "model", "metrics", "report", "manifest"]}, "uri": {"type": "string", "pattern": "^(?!.*(?:/main/|/latest/))(?:s3|file|https)://[^\\s]+$"}}}
+  }
+}

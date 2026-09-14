@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "name": "dataset-snapshot",
+  "stage": "snapshot",
+  "image": {"repository": "ml-platform-study/components/snapshot", "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+  "command": ["python", "-m", "component.snapshot"],
+  "inputs": [{"name": "source-dataset", "kind": "dataset", "uri": "s3://ml-platform-artifacts/lakefs/housing-sale/commits/abc123/"}],
+  "outputs": [{"name": "snapshot-manifest", "kind": "manifest", "uri": "s3://ml-platform-internal/projects/ml-platform/runs/run-20260914t120000z-a1b2c3d4/artifacts/snapshot.json"}],
+  "execution": {"timeout_seconds": 600, "retry": {"max_attempts": 2, "retry_safety": "idempotent"}, "cancellation": {"signal": "SIGTERM", "grace_period_seconds": 30, "behavior": "stop-new-work-and-cleanup-local-state"}, "exit_codes": {"success": 0, "cancelled": 130, "retryable": 75, "permanent_failure": 1}},
+  "logging": {"format": "json-lines", "correlation_fields": ["run_id", "component_name", "attempt"], "raw_data_logging": false},
+  "provenance": {"run_manifest": "write-on-success-and-failure", "lineage": "emit-start-complete-fail"},
+  "state": {"shared_memory_required": false, "durable_state": "declared-artifacts-only"}
+}
