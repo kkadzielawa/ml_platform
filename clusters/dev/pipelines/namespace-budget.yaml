@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: kubeflow-pipelines-study-quota
+  namespace: kubeflow
+  labels:
+    ml-platform.local/owner: platform-team
+    ml-platform.local/workload-class: pipeline-control-plane
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 6Gi
+    limits.cpu: "8"
+    limits.memory: 14Gi
+    pods: "30"
+    services: "20"
+    configmaps: "40"
+    secrets: "30"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: kubeflow-pipelines-study-defaults
+  namespace: kubeflow
+  labels:
+    ml-platform.local/owner: platform-team
+    ml-platform.local/workload-class: pipeline-control-plane
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 500m
+        memory: 1Gi
+      defaultRequest:
+        cpu: 50m
+        memory: 128Mi

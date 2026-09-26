@@ -1,0 +1,177 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# KFP 2.17.0, commit 4a3592cb2dd0a91a4652ab93893ec8beda1f3158.
+resources:
+  - https://github.com/kubeflow/pipelines/manifests/kustomize/env/dev?ref=2.17.0
+  - namespace-budget.yaml
+
+# The upstream development overlay intentionally uses mutable `master` tags.
+# Replace every KFP server image with the tagged release selected for this study.
+images:
+  - name: ghcr.io/kubeflow/kfp-api-server
+    newTag: 2.17.0
+  - name: ghcr.io/kubeflow/kfp-cache-deployer
+    newTag: 2.17.0
+  - name: ghcr.io/kubeflow/kfp-cache-server
+    newTag: 2.17.0
+  - name: ghcr.io/kubeflow/kfp-frontend
+    newTag: 2.17.0
+  - name: ghcr.io/kubeflow/kfp-metadata-envoy
+    newTag: 2.17.0
+  - name: ghcr.io/kubeflow/kfp-metadata-writer
+    newTag: 2.17.0
+  - name: ghcr.io/kubeflow/kfp-persistence-agent
+    newTag: 2.17.0
+  - name: ghcr.io/kubeflow/kfp-scheduled-workflow-controller
+    newTag: 2.17.0
+  - name: ghcr.io/kubeflow/kfp-viewer-crd-controller
+    newTag: 2.17.0
+  - name: ghcr.io/kubeflow/kfp-visualization-server
+    newTag: 2.17.0
+
+patches:
+  # KFP's standalone dev public proxy uses host networking. Local study access
+  # is intentionally limited to kubectl port-forward instead.
+  - target: {group: apps, version: v1, kind: Deployment, name: proxy-agent}
+    patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: {name: proxy-agent}
+  - target: {version: v1, kind: ConfigMap, name: inverse-proxy-config}
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ConfigMap
+      metadata: {name: inverse-proxy-config}
+  - target: {version: v1, kind: ServiceAccount, name: proxy-agent-runner}
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata: {name: proxy-agent-runner}
+  - target: {group: rbac.authorization.k8s.io, version: v1, kind: Role, name: proxy-agent-runner}
+    patch: |-
+      $patch: delete
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: Role
+      metadata: {name: proxy-agent-runner}
+  - target: {group: rbac.authorization.k8s.io, version: v1, kind: RoleBinding, name: proxy-agent-runner}
+    patch: |-
+      $patch: delete
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata: {name: proxy-agent-runner}
+
+  # Garage is the selected shared S3-compatible artifact store for the study.
+  - target: {version: v1, kind: ConfigMap, name: pipeline-install-config}
+    patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata: {name: pipeline-install-config}
+      data:
+        bucketName: ml-platform-artifacts
+        defaultPipelineRoot: s3://ml-platform-artifacts/projects/ml-platform/artifacts/kfp/v2
+        BLOCK_V1_PIPELINES: "true"
+  # The upstream env/dev overlay substitutes this ConfigMap before this local
+  # patch changes pipeline-install-config. Patch it explicitly so v2 drivers
+  # generate s3:// artifact URIs with Garage session settings, rather than
+  # the upstream minio:// URI that assumes SeaweedFS.
+  - target: {version: v1, kind: ConfigMap, name: kfp-launcher}
+    patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata: {name: kfp-launcher}
+      data:
+        defaultPipelineRoot: s3://ml-platform-artifacts/projects/ml-platform/artifacts/kfp/v2
+        providers: |
+          s3:
+            default:
+              endpoint: garage-s3.ml-platform-data.svc.cluster.local:3900
+              region: garage
+              disableSSL: true
+              forcePathStyle: true
+              credentials:
+                secretRef:
+                  secretName: mlpipeline-minio-artifact
+                  accessKeyKey: accesskey
+                  secretKeyKey: secretkey
+  - target: {version: v1, kind: ConfigMap, name: workflow-controller-configmap}
+    patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata: {name: workflow-controller-configmap}
+      data:
+        artifactRepository: |
+          archiveLogs: true
+          s3:
+            endpoint: garage-s3.ml-platform-data.svc.cluster.local:3900
+            bucket: ml-platform-artifacts
+            keyFormat: projects/ml-platform/artifacts/kfp/private-artifacts/{{workflow.namespace}}/{{workflow.name}}/{{workflow.creationTimestamp.Y}}/{{workflow.creationTimestamp.m}}/{{workflow.creationTimestamp.d}}/{{pod.name}}
+            insecure: true
+            accessKeySecret:
+              name: mlpipeline-minio-artifact
+              key: accesskey
+            secretKeySecret:
+              name: mlpipeline-minio-artifact
+              key: secretkey
+  - target: {group: apps, version: v1, kind: Deployment, name: ml-pipeline}
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: {name: ml-pipeline}
+      spec:
+        template:
+          spec:
+            containers:
+              - name: ml-pipeline-api-server
+                env:
+                  - name: OBJECTSTORECONFIG_HOST
+                    value: garage-s3.ml-platform-data.svc.cluster.local
+                  - name: OBJECTSTORECONFIG_PORT
+                    value: "3900"
+                  - name: V2_DRIVER_IMAGE
+                    value: ghcr.io/kubeflow/kfp-driver:2.17.0
+                  - name: V2_LAUNCHER_IMAGE
+                    value: ghcr.io/kubeflow/kfp-launcher:2.17.0
+
+  # The upstream dev overlay otherwise installs its own SeaweedFS bucket.
+  # It is deliberately absent: the scoped Garage credentials are created by
+  # make apply-orchestrator after data-storage is available.
+  - target: {group: apps, version: v1, kind: Deployment, name: seaweedfs}
+    patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: {name: seaweedfs}
+  - target: {version: v1, kind: Service, name: seaweedfs}
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata: {name: seaweedfs}
+  - target: {version: v1, kind: PersistentVolumeClaim, name: seaweedfs-pvc}
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata: {name: seaweedfs-pvc}
+  - target: {version: v1, kind: ServiceAccount, name: seaweedfs}
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata: {name: seaweedfs}
+  - target: {group: networking.k8s.io, version: v1, kind: NetworkPolicy, name: seaweedfs}
+    patch: |-
+      $patch: delete
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata: {name: seaweedfs}
+  - target: {version: v1, kind: Secret, name: mlpipeline-minio-artifact}
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Secret
+      metadata: {name: mlpipeline-minio-artifact}

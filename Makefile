@@ -166,6 +166,12 @@ export MLFLOW_OIDC_CLIENT_SECRET ?= local-dev-mlflow-oidc-client-secret
 export MLFLOW_OIDC_COOKIE_SECRET ?= bWwtcGxhdGZvcm0tbWxmbG93LWNvb2tpZS1zZWNyZXQ=
 export MLFLOW_BASELINE_EXPERIMENT ?= housing-sale-baseline-cluster
 export MLFLOW_BASELINE_MODEL ?= housing-sale-baseline-cluster
+export KFP_VERSION ?= 2.17.0
+export KFP_NAMESPACE ?= kubeflow
+export KFP_PORT ?= 18085
+export KFP_ARTIFACT_BUCKET ?= ml-platform-artifacts
+export KFP_ARTIFACT_PREFIX ?= projects/ml-platform/artifacts/kfp/
+export KFP_SMOKE_IMAGE ?= docker.io/library/python:3.12.13-slim-bookworm@sha256:6e13e65c55e33adf203d77ee371cf8bf5d81bd4902ef07565721f46bf44917af
 
 .PHONY: test test-versions test-contracts test-dataset-contracts test-pipeline-contracts test-baseline-data test-data-transforms test-data-quality test-ingestion test-openlineage test-openmetadata test-table-route test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability transform-baseline-data ingest-baseline train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-data-storage test-data-storage-access test-data-retention apply-lakefs test-lakefs apply-openmetadata apply-mlflow test-cluster-mlflow apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops apply-admission-policy test-admission-policy e2e-phase-02 e2e-data-reproducibility e2e-phase-03 build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy sign-fixture verify-fixture
 test:
@@ -428,6 +434,20 @@ apply-mlflow: apply-oidc-fixture apply-namespaces
 	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=5m --namespace $(MLFLOW_CLUSTER_NAMESPACE) job/mlflow-baseline-recreation --for=condition=Complete
 	@echo "MLflow internal service: mlflow.$(MLFLOW_CLUSTER_NAMESPACE).svc.cluster.local:5000"
 	@echo "MLflow browser route: kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward -n $(MLFLOW_CLUSTER_NAMESPACE) svc/mlflow-auth $(MLFLOW_CLUSTER_PORT):4180"
+.PHONY: apply-orchestrator test-orchestrator
+
+apply-orchestrator: apply-data-storage
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k "https://github.com/kubeflow/pipelines/manifests/kustomize/cluster-scoped-resources?ref=$(KFP_VERSION)"
+	kubectl --context kind-$(KIND_CLUSTER_NAME) wait --for=condition=established --timeout=2m crd/applications.app.k8s.io
+	@set -eu; artifact_access_key=$$(kubectl --context kind-$(KIND_CLUSTER_NAME) get secret data-storage-scoped-credentials --namespace $(CLUSTER_GARAGE_NAMESPACE) -o jsonpath='{.data.artifacts-access-key-id}' | base64 --decode); artifact_secret_key=$$(kubectl --context kind-$(KIND_CLUSTER_NAME) get secret data-storage-scoped-credentials --namespace $(CLUSTER_GARAGE_NAMESPACE) -o jsonpath='{.data.artifacts-secret-access-key}' | base64 --decode); test -n "$$artifact_access_key"; test -n "$$artifact_secret_key"; kubectl --context kind-$(KIND_CLUSTER_NAME) create secret generic mlpipeline-minio-artifact --namespace $(KFP_NAMESPACE) --from-literal=accesskey="$$artifact_access_key" --from-literal=secretkey="$$artifact_secret_key" --dry-run=client -o yaml | kubectl --context kind-$(KIND_CLUSTER_NAME) apply -f -
+	kubectl --context kind-$(KIND_CLUSTER_NAME) apply -k clusters/dev/pipelines
+	@for deployment in mysql metadata-grpc-deployment metadata-writer ml-pipeline ml-pipeline-persistenceagent ml-pipeline-scheduledworkflow ml-pipeline-ui ml-pipeline-visualizationserver workflow-controller; do kubectl --context kind-$(KIND_CLUSTER_NAME) wait --timeout=8m --namespace $(KFP_NAMESPACE) deployment/$$deployment --for=condition=Available; done
+	@echo "KFP UI: kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward -n $(KFP_NAMESPACE) svc/ml-pipeline-ui $(KFP_PORT):80"
+
+test-orchestrator:
+	python -m pytest tests/integration/orchestrator
+	@set -eu; artifact_access_key=$$(kubectl --context kind-$(KIND_CLUSTER_NAME) get secret data-storage-scoped-credentials --namespace $(CLUSTER_GARAGE_NAMESPACE) -o jsonpath='{.data.artifacts-access-key-id}' | base64 --decode); artifact_secret_key=$$(kubectl --context kind-$(KIND_CLUSTER_NAME) get secret data-storage-scoped-credentials --namespace $(CLUSTER_GARAGE_NAMESPACE) -o jsonpath='{.data.artifacts-secret-access-key}' | base64 --decode); kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward --namespace $(KFP_NAMESPACE) svc/ml-pipeline-ui $(KFP_PORT):80 >/tmp/ml-platform-kfp-port-forward.log 2>&1 & kfp_forward_pid=$$!; kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward --namespace $(CLUSTER_GARAGE_NAMESPACE) svc/garage-s3 $(CLUSTER_GARAGE_PORT):3900 >/tmp/ml-platform-kfp-garage-port-forward.log 2>&1 & garage_forward_pid=$$!; trap 'kill $$kfp_forward_pid $$garage_forward_pid 2>/dev/null || true' EXIT; for attempt in $$(seq 1 60); do if python -c 'import socket; s=socket.socket(); s.settimeout(1); status=s.connect_ex(("127.0.0.1", $(KFP_PORT))); s.close(); raise SystemExit(status)' >/dev/null 2>&1; then break; fi; sleep 1; done; for attempt in $$(seq 1 60); do if python -c 'import socket; s=socket.socket(); s.settimeout(1); status=s.connect_ex(("127.0.0.1", $(CLUSTER_GARAGE_PORT))); s.close(); raise SystemExit(status)' >/dev/null 2>&1; then break; fi; sleep 1; done; docker run --rm --network host -v "$(CURDIR):/workspace" -w /workspace -e KFP_ENDPOINT=http://127.0.0.1:$(KFP_PORT) -e KFP_NAMESPACE=$(KFP_NAMESPACE) -e KFP_ARTIFACT_BUCKET=$(KFP_ARTIFACT_BUCKET) -e KFP_ARTIFACT_PREFIX=$(KFP_ARTIFACT_PREFIX) -e KFP_S3_ENDPOINT_URL=http://127.0.0.1:$(CLUSTER_GARAGE_PORT) -e AWS_ACCESS_KEY_ID="$$artifact_access_key" -e AWS_SECRET_ACCESS_KEY="$$artifact_secret_key" -e AWS_DEFAULT_REGION=garage "$(KFP_SMOKE_IMAGE)" sh -ec 'python -m pip install --no-cache-dir boto3==1.43.67 kfp==$(KFP_VERSION); python tests/integration/orchestrator/smoke_kfp.py'
+
 	@echo "Keycloak browser route: kubectl --context kind-$(KIND_CLUSTER_NAME) port-forward -n $(KEYCLOAK_NAMESPACE) svc/keycloak $(KEYCLOAK_PORT):8080"
 
 test-cluster-mlflow:
