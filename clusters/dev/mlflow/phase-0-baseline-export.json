@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "source_experiment": "local-ml-flow",
+  "source_run": "phase-0-baseline",
+  "dataset": "housing-sale-features-v0001",
+  "params": {
+    "model_family": "random-forest-classifier",
+    "migration_route": "explicit-recreation"
+  },
+  "metrics": {
+    "baseline_recreation": 1.0
+  }
+}

@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-auth
+  namespace: ml-platform-data
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: mlflow-auth}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: mlflow-auth}
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.12.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --http-address=0.0.0.0:4180
+            - --upstream=http://mlflow.ml-platform-data.svc.cluster.local:5000
+            - --provider=keycloak-oidc
+            - --oidc-issuer-url=http://keycloak.ml-platform-system.svc.cluster.local:8080/realms/ml-platform-study
+            - --login-url=http://127.0.0.1:18081/realms/ml-platform-study/protocol/openid-connect/auth
+            - --redeem-url=http://keycloak.ml-platform-system.svc.cluster.local:8080/realms/ml-platform-study/protocol/openid-connect/token
+            - --oidc-jwks-url=http://keycloak.ml-platform-system.svc.cluster.local:8080/realms/ml-platform-study/protocol/openid-connect/certs
+            - --client-id=$(OAUTH2_PROXY_CLIENT_ID)
+            - --client-secret=$(OAUTH2_PROXY_CLIENT_SECRET)
+            - --cookie-secret=$(OAUTH2_PROXY_COOKIE_SECRET)
+            - --cookie-secure=false
+            - --redirect-url=http://127.0.0.1:15001/oauth2/callback
+            - --email-domain=*
+            - --reverse-proxy=true
+            - --skip-provider-button=true
+            - --pass-authorization-header=true
+            - --set-xauthrequest=true
+          env:
+            - name: OAUTH2_PROXY_CLIENT_ID
+              valueFrom: {secretKeyRef: {name: mlflow-oidc-client, key: client-id}}
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: mlflow-oidc-client, key: client-secret}}
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom: {secretKeyRef: {name: mlflow-oidc-client, key: cookie-secret}}
+          ports: [{containerPort: 4180, name: http}]
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 200m, memory: 256Mi}
+          readinessProbe:
+            httpGet: {path: /ping, port: http}
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-auth
+  namespace: ml-platform-data
+spec:
+  selector: {app.kubernetes.io/name: mlflow-auth}
+  ports: [{name: http, port: 4180, targetPort: http}]

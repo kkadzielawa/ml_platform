@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mlflow-oidc-client-registration
+  namespace: ml-platform-system
+  labels:
+    app.kubernetes.io/name: mlflow-oidc-client-registration
+    app.kubernetes.io/component: identity-client
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mlflow-oidc-client-registration
+        app.kubernetes.io/component: identity-client
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: register-client
+          image: docker.io/library/python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command: [python, /registration/register_mlflow_oidc.py]
+          env:
+            - name: KEYCLOAK_URL
+              value: http://keycloak.ml-platform-system.svc.cluster.local:8080
+            - name: KEYCLOAK_REALM
+              value: ml-platform-study
+            - name: KEYCLOAK_ADMIN_USERNAME
+              valueFrom: {secretKeyRef: {name: keycloak-bootstrap-admin, key: username}}
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: keycloak-bootstrap-admin, key: password}}
+            - name: OIDC_CLIENT_ID
+              valueFrom: {secretKeyRef: {name: mlflow-oidc-client, key: client-id}}
+            - name: OIDC_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: mlflow-oidc-client, key: client-secret}}
+            - name: OIDC_REDIRECT_URI
+              value: http://127.0.0.1:15001/oauth2/callback
+            - name: OIDC_BROWSER_ORIGIN
+              value: http://127.0.0.1:15001
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 150m, memory: 192Mi}
+          volumeMounts:
+            - name: registration
+              mountPath: /registration
+              readOnly: true
+      volumes:
+        - name: registration
+          configMap:
+            name: mlflow-oidc-registration

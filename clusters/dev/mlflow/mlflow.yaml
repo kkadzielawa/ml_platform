@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: ml-platform-data
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: mlflow}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: mlflow}
+    spec:
+      containers:
+        - name: mlflow
+          image: ghcr.io/mlflow/mlflow:v3.13.0@sha256:a5cd51cd14b570ec4374a4dad76a8ff92b7a0a6f66904c871cee18703487d23f
+          imagePullPolicy: IfNotPresent
+          command: [sh, -ec]
+          args:
+            - python -c "import boto3, psycopg2" || python -m pip install --no-cache-dir boto3==1.43.67 psycopg2-binary==2.9.12; exec mlflow server --host 0.0.0.0 --port 5000 --workers 1 --allowed-hosts "mlflow.ml-platform-data.svc.cluster.local:5000,mlflow.ml-platform-data.svc:5000,mlflow.ml-platform-data:5000,mlflow:5000,127.0.0.1:15001,localhost:15001,127.0.0.1:15002,localhost:15002" --cors-allowed-origins "http://127.0.0.1:15001,http://localhost:15001" --backend-store-uri "$MLFLOW_BACKEND_STORE_URI" --default-artifact-root "$MLFLOW_DEFAULT_ARTIFACT_ROOT"
+          ports: [{containerPort: 5000, name: http}]
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: {secretKeyRef: {name: data-storage-scoped-credentials, key: artifacts-access-key-id}}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: {secretKeyRef: {name: data-storage-scoped-credentials, key: artifacts-secret-access-key}}
+            - name: AWS_DEFAULT_REGION
+              value: garage
+            - name: AWS_REGION
+              value: garage
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: http://garage-s3.ml-platform-data.svc.cluster.local:3900
+            - name: MLFLOW_DEFAULT_ARTIFACT_ROOT
+              value: s3://ml-platform-artifacts/projects/ml-platform/artifacts/mlflow
+            - name: MLFLOW_BACKEND_STORE_URI
+              valueFrom: {secretKeyRef: {name: mlflow-backend, key: uri}}
+          resources:
+            requests: {cpu: 200m, memory: 512Mi}
+            limits: {cpu: 750m, memory: 2Gi}
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+            failureThreshold: 120
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+  namespace: ml-platform-data
+spec:
+  selector: {app.kubernetes.io/name: mlflow}
+  ports: [{name: http, port: 5000, targetPort: http}]

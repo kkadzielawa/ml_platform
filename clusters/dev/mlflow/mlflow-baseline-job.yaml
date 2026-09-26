@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mlflow-baseline-recreation
+  namespace: ml-platform-data
+  labels:
+    app.kubernetes.io/name: mlflow-baseline-recreation
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mlflow-baseline-recreation
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: recreate-baseline
+          image: ghcr.io/mlflow/mlflow:v3.13.0@sha256:a5cd51cd14b570ec4374a4dad76a8ff92b7a0a6f66904c871cee18703487d23f
+          imagePullPolicy: IfNotPresent
+          command: [sh, -ec]
+          args:
+            - >-
+              python -c "import boto3, psycopg2" ||
+              python -m pip install --no-cache-dir boto3==1.43.67 psycopg2-binary==2.9.12;
+              python /migration/recreate_baseline.py
+          env:
+            - name: MLFLOW_TRACKING_URI
+              value: http://mlflow.ml-platform-data.svc.cluster.local:5000
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: {secretKeyRef: {name: data-storage-scoped-credentials, key: artifacts-access-key-id}}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: {secretKeyRef: {name: data-storage-scoped-credentials, key: artifacts-secret-access-key}}
+            - name: AWS_DEFAULT_REGION
+              value: garage
+            - name: AWS_REGION
+              value: garage
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: http://garage-s3.ml-platform-data.svc.cluster.local:3900
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: 500m, memory: 768Mi}
+          volumeMounts:
+            - name: migration
+              mountPath: /migration
+              readOnly: true
+      volumes:
+        - name: migration
+          configMap:
+            name: mlflow-baseline-recreation
