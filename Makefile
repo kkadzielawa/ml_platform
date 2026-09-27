@@ -175,6 +175,7 @@ export KFP_SMOKE_IMAGE ?= docker.io/library/python:3.12.13-slim-bookworm@sha256:
 export COMPONENT_BASE_IMAGE ?= ml-platform-study/component-base:local
 
 .PHONY: test-component-snapshot
+.PHONY: test-component-train-classic
 .PHONY: test-component-sdk build-component-base
 .PHONY: test test-versions test-contracts test-dataset-contracts test-pipeline-contracts test-baseline-data test-data-transforms test-data-quality test-ingestion test-openlineage test-openmetadata test-table-route test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability transform-baseline-data ingest-baseline train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-data-storage test-data-storage-access test-data-retention apply-lakefs test-lakefs apply-openmetadata apply-mlflow test-cluster-mlflow apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops apply-admission-policy test-admission-policy e2e-phase-02 e2e-data-reproducibility e2e-phase-03 build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy sign-fixture verify-fixture
 test:
@@ -188,6 +189,9 @@ build-component-base:
 
 test-component-snapshot:
 	python -m pytest tests/components/snapshot
+
+test-component-train-classic:
+	python -m pytest tests/components/train_classic
 
 test-versions:
 	python -m pytest tests/config
