@@ -1,0 +1,347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/ml-platform-study/contracts/evaluation.schema.json",
+  "title": "Classic ML Offline Evaluation Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "component",
+    "evaluation_id",
+    "run_id",
+    "status",
+    "decision",
+    "dataset",
+    "model",
+    "code",
+    "thresholds",
+    "metrics",
+    "slices",
+    "latency",
+    "checks",
+    "failures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "component": {
+      "const": "offline-evaluation"
+    },
+    "evaluation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^run-\\d{8}t\\d{6}z-[0-9a-f]{8}$"
+    },
+    "status": {
+      "enum": ["passed", "failed"]
+    },
+    "decision": {
+      "enum": ["pass", "fail"]
+    },
+    "dataset": {
+      "$ref": "#/$defs/dataset"
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate", "baseline"],
+      "properties": {
+        "candidate": {
+          "$ref": "#/$defs/candidateModel"
+        },
+        "baseline": {
+          "$ref": "#/$defs/baselineModel"
+        }
+      }
+    },
+    "code": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "minimum_accuracy",
+        "minimum_improvement",
+        "maximum_brier_score",
+        "maximum_latency_p95_ms",
+        "minimum_slice_accuracy"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimum_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimum_improvement": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_brier_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_latency_p95_ms": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum_slice_accuracy": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "metrics": {
+      "$ref": "#/$defs/metrics"
+    },
+    "slices": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/slice"
+      }
+    },
+    "latency": {
+      "$ref": "#/$defs/latency"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": ["string", "null"],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "revision", "test_rows", "test_csv_sha256", "metadata_sha256"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "test_csv_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "metadata_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "candidateModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "artifact_sha256"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "baselineModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "version", "artifact_sha256"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_accuracy",
+        "baseline_accuracy",
+        "improvement",
+        "candidate_brier_score",
+        "baseline_brier_score"
+      ],
+      "properties": {
+        "candidate_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "baseline_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "improvement": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "candidate_brier_score": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "baseline_brier_score": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "slice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["column", "value", "rows", "candidate_accuracy", "baseline_accuracy", "improvement", "passed"],
+      "properties": {
+        "column": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string"
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidate_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "baseline_accuracy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "improvement": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "latency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixture", "warmup_samples", "samples", "p50_ms", "p95_ms", "max_ms", "threshold_p95_ms", "passed"],
+      "properties": {
+        "fixture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "warmup_samples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "samples": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "p50_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p95_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "threshold_p95_ms": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "observed", "operator", "threshold", "passed"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed": {
+          "type": ["number", "null"]
+        },
+        "operator": {
+          "enum": [">=", "<="]
+        },
+        "threshold": {
+          "type": "number"
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
