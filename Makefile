@@ -172,12 +172,14 @@ export KFP_PORT ?= 18085
 export KFP_ARTIFACT_BUCKET ?= ml-platform-artifacts
 export KFP_ARTIFACT_PREFIX ?= projects/ml-platform/artifacts/kfp/
 export KFP_SMOKE_IMAGE ?= docker.io/library/python:3.12.13-slim-bookworm@sha256:6e13e65c55e33adf203d77ee371cf8bf5d81bd4902ef07565721f46bf44917af
+export CLASSIC_PIPELINE_PACKAGE ?= build/pipelines/classic-ml.yaml
 export COMPONENT_BASE_IMAGE ?= ml-platform-study/component-base:local
 
 .PHONY: test-component-snapshot
 .PHONY: test-component-train-classic
 .PHONY: test-component-evaluate-classic
 .PHONY: test-component-sdk build-component-base
+.PHONY: compile-classic-pipeline test-classic-pipeline-spec
 .PHONY: test test-versions test-contracts test-dataset-contracts test-pipeline-contracts test-baseline-data test-data-transforms test-data-quality test-ingestion test-openlineage test-openmetadata test-table-route test-manifests test-environments compose-up-postgres test-postgres compose-up-object-store test-object-store compose-up-mlflow test-mlflow compose-up-observability test-observability transform-baseline-data ingest-baseline train-baseline test-baseline-training serve-baseline serve-baseline-smoke e2e-phase-00 cluster-create cluster-status cluster-delete apply-namespaces apply-gateway test-gateway apply-tls test-tls apply-network-policy test-network-policy apply-postgres test-cluster-postgres apply-object-storage test-cluster-object-storage apply-data-storage test-data-storage-access test-data-retention apply-lakefs test-lakefs apply-openmetadata apply-mlflow test-cluster-mlflow apply-registry test-registry backup-phase-01 verify-backup-phase-01 restore-drill-phase-01 e2e-phase-01 apply-keycloak test-keycloak apply-oidc-fixture test-oidc apply-rbac test-rbac apply-secrets test-secrets test-secret-rotation apply-ci test-ci apply-gitops test-gitops apply-admission-policy test-admission-policy e2e-phase-02 e2e-data-reproducibility e2e-phase-03 build-fixture test-image sbom-fixture test-sbom scan-fixture test-scan-policy sign-fixture verify-fixture
 test:
 	python -m pytest
@@ -196,6 +198,20 @@ test-component-train-classic:
 
 test-component-evaluate-classic:
 	python -m pytest tests/components/evaluate_classic
+
+compile-classic-pipeline:
+	@mkdir -p "$(dir $(CLASSIC_PIPELINE_PACKAGE))"
+	@if python -c 'import kfp' >/dev/null 2>&1; then \
+		python -m pipelines.classic_ml.pipeline --output "$(CLASSIC_PIPELINE_PACKAGE)"; \
+	elif command -v docker >/dev/null 2>&1; then \
+		docker run --rm -v "$(CURDIR):/workspace" -w /workspace "$(KFP_SMOKE_IMAGE)" sh -ec 'python -m pip install --no-cache-dir kfp==$(KFP_VERSION); python -m pipelines.classic_ml.pipeline --output "$(CLASSIC_PIPELINE_PACKAGE)"'; \
+	else \
+		echo "KFP SDK is unavailable; install kfp==$(KFP_VERSION) or install Docker for the compile fallback"; \
+		exit 1; \
+	fi
+
+test-classic-pipeline-spec:
+	python -m pytest tests/pipelines/classic_ml
 
 test-versions:
 	python -m pytest tests/config
