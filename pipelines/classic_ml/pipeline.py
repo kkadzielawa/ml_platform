@@ -11,6 +11,14 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .runtime_policies import (
+    RUNTIME_POLICY_VERSION,
+    RUNTIME_POLICIES,
+    apply_runtime_policy,
+    bounded_command,
+    runtime_policy_spec,
+)
+
 
 CLASSIC_PIPELINE_NAME = "classic-ml-study"
 PIPELINE_ROOT = os.environ.get(
@@ -76,6 +84,8 @@ def pipeline_spec() -> dict[str, Any]:
             "registration_requires_passing_evaluation": True,
             "run_on_import": False,
         },
+        "runtime_policy_version": RUNTIME_POLICY_VERSION,
+        "runtime_policies": runtime_policy_spec(),
     }
 
 
@@ -100,7 +110,7 @@ def build_pipeline():
     ):
         return dsl.ContainerSpec(
             image=COMPONENT_IMAGE,
-            command=["python", "-m", "components.snapshot"],
+            command=bounded_command("components.snapshot", RUNTIME_POLICIES["snapshot"]),
             args=[
                 "--repository",
                 repository,
@@ -122,7 +132,7 @@ def build_pipeline():
     ):
         return dsl.ContainerSpec(
             image=COMPONENT_IMAGE,
-            command=["python", "-m", "components.validate"],
+            command=bounded_command("components.validate", RUNTIME_POLICIES["validate"]),
             args=[
                 "--snapshot",
                 snapshot_manifest.path,
@@ -144,7 +154,7 @@ def build_pipeline():
     ):
         return dsl.ContainerSpec(
             image=COMPONENT_IMAGE,
-            command=["python", "-m", "components.transform"],
+            command=bounded_command("components.transform", RUNTIME_POLICIES["transform"]),
             args=[
                 "--run-id",
                 run_id,
@@ -171,7 +181,7 @@ def build_pipeline():
     ):
         return dsl.ContainerSpec(
             image=COMPONENT_IMAGE,
-            command=["python", "-m", "components.train_classic"],
+            command=bounded_command("components.train_classic", RUNTIME_POLICIES["train"]),
             args=[
                 "--run-id",
                 run_id,
@@ -212,7 +222,7 @@ def build_pipeline():
     ):
         return dsl.ContainerSpec(
             image=COMPONENT_IMAGE,
-            command=["python", "-m", "components.evaluate_classic"],
+            command=bounded_command("components.evaluate_classic", RUNTIME_POLICIES["evaluate"]),
             args=[
                 "--run-id",
                 run_id,
@@ -253,7 +263,7 @@ def build_pipeline():
     ):
         return dsl.ContainerSpec(
             image=COMPONENT_IMAGE,
-            command=["python", "-m", "components.register_model"],
+            command=bounded_command("components.register_model", RUNTIME_POLICIES["register"]),
             args=[
                 "--run-id",
                 run_id,
@@ -349,8 +359,15 @@ def build_pipeline():
             license_record_path=license_record_path,
         )
         register.after(evaluate)
-        for task in (snapshot, validation, transform, train, evaluate, register):
-            task.set_caching_options(False)
+        for stage, task in (
+            ("snapshot", snapshot),
+            ("validate", validation),
+            ("transform", transform),
+            ("train", train),
+            ("evaluate", evaluate),
+            ("register", register),
+        ):
+            apply_runtime_policy(task, stage)
 
     return classic_ml_pipeline
 
